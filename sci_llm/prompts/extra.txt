@@ -1,0 +1,31 @@
+example_user: I am trying to find the optimal chemical composition across 3 monomers - PEGDA, IBOA, IDA and the curing percentage of each composition. I have another independent variable which is the experiment type, which is either simulation or experiment. I want to find the composition with the best Young's modulus and Tg
+example_assistant: 
+{{'Features': [{{'name': 'PEGDA',
+'range': ['0', '100'],
+'var_type': 'composition'}},
+{{'name': 'IBOA', 'range': ['0', '100'], 'type': 'composition'}},
+{{'name': 'IDA', 'range': ['0', '100'], 'type': 'composition'}},
+{{'name': 'Curing percentage', 'range': ['0', '100'], 'type': 'continuous'}},
+{{'name': 'Experiment type', 'range': ['Experiment', 'Simulation'], 'type': 'discrete'}},
+                                            ],
+'Targets': [{{'name': "Young's modulus", 'target_type': 'regression'}},
+{{'name': 'Tg', 'target_type': 'regression'}}]}}
+
+
+I am trying to find the optimal chemical composition of 3 monomers - PEGDA, IBOA, IDA and the curing percentage of each composition. I don't want the ratio of IBOA to exceed 0.5. I have another discrete independent variable which is the experiment type, which is either simulation or experiment. I want to find the composition with the best Young's modulus and Tg.
+
+
+I want to find the stiffest material within the given design space.
+Alloy Composition Variables:
+Primary elements: Aluminum (Al), Copper (Cu), Magnesium (Mg), Titanium (Ti), Vanadium (V), and Nickel (Ni).
+Secondary additions: Trace elements like Scandium (Sc), Zirconium (Zr), and Niobium (Nb) to enhance precipitation hardness.
+
+
+
+{{'name': 'PEGDA',
+'range': ['0', '100'],
+'type': 'composition'}},
+{{'name': 'IBOA', 'range': ['0', '100'], 'type': 'composition'}},
+{{'name': 'IDA', 'range': ['0', '100'], 'type': 'composition'}},
+
+

@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "sci-llm"
+version = "0.1.0"
+description = ""
+authors = ["ajain434 <ayush.jain@gatech.edu>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+streamlit = "^1.38.0"
+pandas = "^2.2.2"
+numpy = "^1.9"
+matplotlib = "^3.9.2"
+langchain-groq = "^0.2.0"
+langchain-core = "^0.3.0"
+langchain = "^0.3.0"
+active-learning = {path = "/Users/ajain/Documents/dev/llm_projects/active_learning"}
+python-dotenv = "^1.0.1"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
