@@ -25,6 +25,9 @@ if 'json_dict' not in st.session_state:
 if 'input_data' not in st.session_state:
     st.session_state.input_data = None
 
+if "recommendations" not in st.session_state:
+    st.session_state.recommendations = None
+
 # Streamlit app
 st.title("Scientific Assistant Chatbot")
 
@@ -58,35 +61,6 @@ for message in st.session_state.messages:
             st.markdown(message["content"])
 
 # User input
-# if prompt := st.chat_input("What's on your mind?"):
-#     base_prompt.format(research_problem=prompt)
-#     if len(st.session_state.messages) == 0:
-#         st.session_state.messages.append({"role": "system", "content": base_prompt})
-#     st.session_state.messages.append({"role": "user", "content": prompt})
-#     st.session_state.messages.append({"role": "system", "content": parsing_vars})
-#     response = generate_response(st.session_state.messages)
-#     st.markdown(response)
-#     st.session_state.messages.append({"role": "assistant", "content": response})
-#     st.session_state.messages.append({"role": "system", "content": "Provide the final project description in the form of a JSON file."})
-
-#     with st.chat_message("user"):
-#         st.markdown(prompt)
-    
-#     # Generate and display assistant response
-#     with st.chat_message("assistant"):
-#         with st.spinner("Thinking..."):
-#             response = generate_response(st.session_state.messages)
-#             st.session_state.messages.append({"role": "assistant", "content": response})
-            
-#             if "```json" in response:
-#                 json_dict = extract_json_from_llm_output(response)
-#                 if json_dict is None:
-#                     st.session_state.messages.append({"role": "system", "content" : "Invalid JSON format. Please correct and try again. Keep the same research problem and explanation to the user."})
-#                     st.markdown(response)
-#                 else: 
-#                     st.session_state.json_dict = set_json_display(json_dict, response)
-#             else:
-#                 st.markdown(response)
 if prompt := st.chat_input("What's on your mind?"):
 
     # Add base prompt to the session state if it's the first input
@@ -179,5 +153,14 @@ if st.session_state.json_dict is not None:
 if st.session_state.input_data is not None:
     with st.sidebar:
         if st.button("Suggest Experiments"):
-            run_active_learning(st.session_state.input_data, st.session_state.json_dict)
-            
+            recommendations = run_active_learning(
+                st.session_state.input_data,
+                st.session_state.json_dict
+            )
+            # Store the DataFrame in session_state
+            st.session_state.recommendations = recommendations
+
+# Display the DataFrame if we have it
+if st.session_state["recommendations"] is not None:
+    st.write("### Experiment Recommendations")
+    st.dataframe(st.session_state.recommendations)

@@ -1,7 +1,7 @@
 # Possible custom errors
 
 
-class DatasetException():
+class DatasetException(BaseException):
     pass
 
 class ColumnMismatchException(DatasetException):

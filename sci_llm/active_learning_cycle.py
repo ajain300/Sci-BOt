@@ -1,6 +1,8 @@
 from sci_llm.active_learning.al_loop import Active_Learning_Loop
 from sci_llm.active_learning.dataset import AL_Dataset
+from sci_llm.active_learning.targets import TARGET_TYPES_DICT
 import pandas as pd
+import numpy as np
 import os
 from typing import Dict
 
@@ -11,8 +13,10 @@ def run_active_learning(input_data : pd.DataFrame, config_dict : Dict) -> pd.Dat
         if 'columns' not in feature.keys():
             feature['columns'] = feature['name']
 
-    config_dict = convert_variable_types(config_dict)
+    config_dict = convert_variable_types_and_format(config_dict)
     print(config_dict)
+
+    input_data = modify_input_data(input_data, config_dict)
     
     dataset = AL_Dataset(config_dict)
     dataset.set_dataset(input_data)
@@ -21,27 +25,48 @@ def run_active_learning(input_data : pd.DataFrame, config_dict : Dict) -> pd.Dat
   
     al_loop = Active_Learning_Loop(dataset)
     recs = al_loop.run_Loop()
-    recs_dict = recs[monomers].to_dict('records')
-    return recs_dict
+    return recs
 
-def convert_variable_types(config):
+def convert_variable_types_and_format(config):
     """
     Convert the variable type names to types within the active learning module
     """
     for feature in config['features']:
         if feature['type'] == 'composition':
             feature['type'] = 'composition'
+            parts = feature['columns']
+            ranges = feature['range']
+            feature['columns'] = {"parts": parts, "range": ranges}
         elif feature['type'] == 'continuous':
             feature['type'] = 'general'
         elif feature['type'] == 'discrete':
             feature['type'] = 'discrete'
         else:
-            raise ValueError(f"Invalid feature type: {feature['type']}")
+            raise ValueError(f"Invalid feature type: {feature['type']}")    
+    
     for target in config['targets']:
-        if target['target_type'] == 'regression':
-            target['target_type'] = 'regression'
-        elif target['target_type'] == 'classification':
-            target['target_type'] = 'classification'
-        else:
+        if target['type']['value'] not in list(TARGET_TYPES_DICT.keys()):
             raise ValueError(f"Invalid target type: {target['target_type']}")
+    
+        target['scaling'] = 'lin'
+            
     return config
+
+def modify_input_data(input_data : pd.DataFrame, config_dict : Dict) -> pd.DataFrame:
+    """
+    Modifies the input data to be in the correct format for the active learning module.
+    """
+    # Convert all columns to float if they can be converted
+    for col in input_data.columns:
+        try:
+            input_data[col] = input_data[col].astype(float)
+        except ValueError:
+            pass
+
+    for target in config_dict['targets']:
+        if f"{target['name']}_std" not in input_data.columns:
+            print(np.array(input_data.loc[:, target['name']]))
+            # Add the standard deviation column if it doesn't exist, with a default value according to the magnitude of the data
+            input_data[f"{target['name']}_std"] = 0.001 * np.mean(abs(np.array(input_data.loc[:, target['name']])))
+            
+    return input_data

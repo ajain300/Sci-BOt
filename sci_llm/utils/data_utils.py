@@ -69,4 +69,4 @@ def check_uploaded_data_columns(uploaded_data, json_dict):
     
     # Check if the columns match
     if set(uploaded_data.columns) != set(feature_names + target_names):
-        raise ColumnMismatchError(f"Columns in the uploaded data do not match the JSON dictionary. Expected {feature_names + target_names}, got {uploaded_data.columns}")
+        raise ColumnMismatchException(f"Columns in the uploaded data do not match the JSON dictionary. Expected {feature_names + target_names}, got {uploaded_data.columns}")

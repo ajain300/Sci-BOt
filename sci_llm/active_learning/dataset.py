@@ -10,6 +10,7 @@ import logging
 # imports from inside active learning
 from .requirement_checkers import RequirementCheckerFactory, RequirementChecker
 from .utils.data_utils import one_hot_encode, flatten
+from .utils.constants import *
 from .features import *
 from .targets import *
 import warnings
@@ -24,8 +25,57 @@ class VariableType(Enum):
     general = "general"
     
 class AL_Dataset:
+    """AL_Dataset is a class designed for handling datasets used in active learning processes. It provides methods for reading, processing, and normalizing data, as well as generating candidate spaces for new data points.
+    Attributes:
+        minimum_feature_keys (list): List of minimum required keys for features.
+        minimum_target_keys (list): List of minimum required keys for targets.
+        logger (logging.Logger): Logger for the class.
+        config (dict): Configuration dictionary for the dataset.
+        targets (dict): Dictionary to store target features.
+        variable_info (dict): Dictionary to store variable information.
+        dataset_stats (dict): Dictionary to store dataset statistics.
+        feature_columns (dict): Dictionary to store feature columns.
+        features (dict): Dictionary to store features.
+        drop_X_columns (list): List of feature columns to be dropped in model input due to data constraints.
+    Methods:
+        __init__(data_config: Union[str, Dict], **kwargs):
+            Initializes the AL_Dataset object with the given configuration.
+        __repr__():
+            Returns a string representation of the AL_Dataset object.
+        read_dataset(path: str):
+            Reads the dataset from the given path.
+        set_dataset(dataset: pd.DataFrame):
+            Sets the dataset to the given DataFrame.
+        X_columns():
+            Returns a list of columns used as features (excluding target features).
+        X_columns_pred():
+            Returns a list of columns used as features for prediction (excluding target features and dropped columns).
+        process_data() -> pd.DataFrame:
+            Processes the data based on the configuration provided, handling different types of features and their requirements.
+        _process_feature_data(data: pd.DataFrame, feature_type: VariableType, columns: Any, name: str) -> pd.DataFrame:
+            Processes feature data based on the feature type and columns.
+        _process_targets(data: pd.DataFrame):
+            Processes target data and returns the modified DataFrame.
+        _process_requirements(data: pd.DataFrame, feature_type: VariableType, columns, requirements: List):
+            Processes requirements for a given feature or column.
+        _normalize_properties(data: pd.DataFrame):
+            Normalizes properties in the DataFrame.
+        get_training_format(**kwargs):
+            Returns the training format of the dataset, including scaled matrices used in training.
+        get_inference_format(data: pd.DataFrame, **kwargs) -> Tuple[np.ndarray, List[str]]:
+            Returns the inference format of the dataset.
+        normalize(data: np.ndarray, variable: str, data_std=None):
+            Normalizes the given data based on the variable's statistics.
+        unnormalize(data, variable, data_std=None):
+            Unnormalizes the given data based on the variable's statistics.
+        generate_candidate_space(**kwargs):
+            Generates a candidate space for new data points based on the configuration.
+        get_dataset_stats():
+            Returns the dataset statistics.
+        make_rec_readable(candidates_df):
+            Converts one-hot encoded columns in the candidates DataFrame to readable format."""
     minimum_feature_keys = ['name', 'type', 'columns']
-    minimum_target_keys = ['name', 'type', 'columns', 'scaling', 'unit']
+    minimum_target_keys = ['name', 'type', 'scaling', 'unit']
 
     def __init__(self, data_config : Union[str, Dict], **kwargs):
         
@@ -94,9 +144,17 @@ class AL_Dataset:
 
             # Extract column information
             if feature_type == VariableType.composition:
-                columns = feature['columns']
+                # Columns are the actual parts of the composition
+                columns = feature['columns']['parts']
+
+                # Ranges are a dict defined for each monomer. If not given, set to default: [0, 100]
+                ranges = feature['columns']['range']
+                for part in columns:
+                    if part not in ranges:
+                        ranges[part] = [0, 100]
+
                 self.X_columns.extend(columns)
-                variable_info = {'scaling': feature.get('scaling', 'lin')}
+                variable_info = {'scaling': feature.get('scaling', 'lin'), 'ranges': ranges}
                 comp = CompositionFeature(feature, 
                                           X_columns=columns, 
                                           variable_info=variable_info)
@@ -159,8 +217,8 @@ class AL_Dataset:
 
             # Set property info based on config
             columns = {
-                'value': target['columns']['value'],
-                'std': target['columns']['std']
+                'value': target['name'],
+                'std': f"{target['name']}_std"
             }
             prop_name = target['name']
             properties = {
@@ -269,8 +327,6 @@ class AL_Dataset:
             else:
                 dataset_cols = [columns]
             
-            print("dataset_cols", dataset_cols)
-            
             feature: GeneralFeature = self.features[name]
 
             feature.X_columns = dataset_cols
@@ -280,9 +336,6 @@ class AL_Dataset:
         # print(columns)
         # print(dataset_cols)
         for col in dataset_cols:
-            print(col)
-
-            print(data.columns)
             if data[col].nunique() == 1:
                 data = data.drop(columns=col)
                 # self.X_columns = [x_col for x_col in self.X_columns if col != x_col]
@@ -302,10 +355,6 @@ class AL_Dataset:
                             value_vars=value_columns + std_columns, 
                             var_name='Y_variable', value_name='Value')
 
-        # data['is_std'] = data['Y_variable'].apply(lambda x: 'Value' if x not in std_columns else 'Variance')
-        # data['Y_variable'] = data['Y_variable'].apply(lambda x: value_columns[std_columns.index(x)] if x in std_columns else x)
-        # data = data.dropna(subset = ["Value"])
-
             # Identify whether each row is a Value or Variance
         melted['is_std'] = np.where(
             melted['Y_variable'].isin(std_columns),
@@ -324,14 +373,10 @@ class AL_Dataset:
         print(data)
         
         # Pivoting the table to wide format to separate value and variance       
-        # data = data.pivot_table(index=self.X_columns + ['Y_variable'], 
-        #                                 columns='is_std', values='Value', 
-        #                                 dropna = False).reset_index()
         data = data.dropna(subset = ["Y_value"]).reset_index(drop = True)
 
         # Renaming columns for clarity
         data.columns.name = None  # Remove the categorization
-        # data = data.rename(columns={'Value': 'Y_value', 'Variance': 'Y_variance'})
         data = data.fillna({"Y_variance" : 0})
 
         # Add column for property number
@@ -554,34 +599,36 @@ class AL_Dataset:
                 #         valid_combinations = valid_combinations[np.sum(valid_combinations[:, mon_ind], axis = 1) >= min_sum]
             elif feature_type == VariableType.discrete:
                 feature_obj = self.features[feature['name']]
-                design_constraints = {k: v for d in feature['design_constraints'] for k, v in d.items()}
-                generate_type = design_constraints.get('design_type', feature['fidelities'])
+                generate_type = feature['range']
                 candidates_per_feature[feature['name']] = []
                 for gen_type in generate_type:
                     candidates_per_feature[feature['name']].append(feature_obj.variable_info[feature_obj.name + "_" + gen_type]['OH_encoding'])
 
-            elif feature_type == VariableType.correlated:
-                feature_obj = self.features[feature['name']]
-                design_constraints = {k: v for d in feature['design_constraints'] for k, v in d.items()}
-                gen_correlated_vars = design_constraints.get('design_type', feature['columns'][0]['name'])
+            # elif feature_type == VariableType.correlated:
+            #     feature_obj = self.features[feature['name']]
+            #     design_constraints = {k: v for d in feature['design_constraints'] for k, v in d.items()}
+            #     gen_correlated_vars = design_constraints.get('design_type', feature['columns'][0]['name'])
                 
-                candidates_per_feature[feature['name']] = []
-                for gen_type in gen_correlated_vars:
-                    gen_type_oh = [feature_obj.variable_info[feature_obj.name + "_type_" + gen_type]['OH_encoding']]
-                    # Get the correlation var 
-                    cor_var_dict = next((d for d in feature['columns'] if d['name'] == gen_type), None)
-                    if cor_var_dict is not None:
-                        requirements = {k: v for d in cor_var_dict['requirements'] for k, v in d.items()}
-                        cor_var_range = requirements['range']
-                        correlated_candidates = list(itertools.product(gen_type_oh,np.linspace(cor_var_range[0], cor_var_range[1], 11)))
-                        candidates_per_feature[feature['name']].extend([flatten(c) for c in correlated_candidates])
-                    else:
-                        raise ValueError(f"Correlated variable {gen_type} in {feature['name']} does not have requirements.")
+            #     candidates_per_feature[feature['name']] = []
+            #     for gen_type in gen_correlated_vars:
+            #         gen_type_oh = [feature_obj.variable_info[feature_obj.name + "_type_" + gen_type]['OH_encoding']]
+            #         # Get the correlation var 
+            #         cor_var_dict = next((d for d in feature['columns'] if d['name'] == gen_type), None)
+            #         if cor_var_dict is not None:
+            #             requirements = {k: v for d in cor_var_dict['requirements'] for k, v in d.items()}
+            #             cor_var_range = requirements['range']
+            #             correlated_candidates = list(itertools.product(gen_type_oh,np.linspace(cor_var_range[0], cor_var_range[1], 11)))
+            #             candidates_per_feature[feature['name']].extend([flatten(c) for c in correlated_candidates])
+            #         else:
+            #             raise ValueError(f"Correlated variable {gen_type} in {feature['name']} does not have requirements.")
             elif feature_type == VariableType.general:
                 feature_obj = self.features[feature['name']]
-                design_constraints = {k: v for d in feature['design_constraints'] for k, v in d.items()}
-                var_range = design_constraints.get('range', [0, 100])
-                var_num_points = design_constraints.get('num_points', 10)
+                # get the edges of the distribution of the feature based on mean and std from the dataset stats
+                mean = self.dataset_stats[f'{feature['name']}_mean']
+                std = self.dataset_stats[f'{feature['name']}_std']
+                var_range = [max(0, mean - 3*std), min(100, mean + 3*std)]
+                var_range = feature.get('range', var_range)
+                var_num_points = DEFAULT_VARIABLE_DISC
                 candidates_per_feature[feature['name']] = np.linspace(var_range[0], var_range[1], var_num_points)
 
 

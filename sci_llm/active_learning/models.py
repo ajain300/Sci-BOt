@@ -48,7 +48,6 @@ class GaussianProcessModel(BaseModel):
         # Set logger if given
         self.logger = kwargs.get('logger', logging.getLogger(__name__))
 
-
     def train(self, **kwargs):
         X_train, Y, Y_std = self.dataset.get_training_format()
         return self._train(X_train, Y, y_var = Y_std, **kwargs)

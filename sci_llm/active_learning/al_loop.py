@@ -15,7 +15,7 @@ class Active_Learning_Loop:
     model_type_to_obj = {'GPR': GaussianProcessModel}
     
     def __init__(self, data : AL_Dataset, 
-                 rec_type = 'diversity_uncertainty', 
+                 rec_type = 'best_score', 
                  model_type = 'GPR', 
                  name = "Active_Learning_Loop", 
                  directory = "active_learning",
@@ -53,10 +53,10 @@ class Active_Learning_Loop:
         logger.info("Running Active_Learning_Loop.run_Loop")
         # Train the model
         self.model.train()
-        self.model.validate_training(os.path.join(self.path, 'training_validation.png'))
+        # self.model.validate_training(os.path.join(self.path, 'training_validation.png'))
         
         # Initialize the acquisition function
-        acq_func = self.rec_to_acq_func[self.rec_type](self.model, 
+        acq_func : AcquisitionFunction = self.rec_to_acq_func[self.rec_type](self.model, 
                                                        self.dataset, 
                                                        targets = self.dataset.targets,
                                                        **kwargs)
