@@ -52,7 +52,7 @@ def get_feature_class(feature_type: str):
     feature_classes = {
         'composition': CompositionFeature,
         'correlated': CorrelatedFeature,
-        'fidelity': FidelityFeature,
+        'fidelity': DiscreteFeature,
         'general': GeneralFeature
     }
     return feature_classes.get(feature_type, GeneralFeature)
