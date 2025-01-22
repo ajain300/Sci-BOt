@@ -29,9 +29,17 @@ Dependencies are specified in `pyproject.toml` and will be automatically resolve
 
 ## Repository Structure
 
-The codebase is divided into two main folders:
+The codebase is divided into two main parts:
 
-### 1. **`active_learning`**
+### 1. **`sci_llm`**
+This folder contains the Streamlit-based frontend application. It integrates an LLM to:
+- Automatically generate the JSON configuration based on user prompts.
+- Accept user input data formatted as specified in the generated JSON.
+- Pass the data and configuration to `active_learning` for inference.
+
+---
+
+### 2. **`sci_llm/active_learning`**
 This folder contains the backend for training machine learning models and making recommendations via inference.
 
 - **Requirements**:
@@ -40,14 +48,6 @@ This folder contains the backend for training machine learning models and making
 
 > **Note**: The column names in the dataset **must match exactly** with those specified in the JSON configuration.
 An example of a json configuration and corresponding dataset are given in the `dataset` folder.
-
----
-
-### 2. **`sci_llm`**
-This folder contains the Streamlit-based frontend application. It integrates an LLM to:
-- Automatically generate the JSON configuration based on user prompts.
-- Accept user input data formatted as specified in the generated JSON.
-- Pass the data and configuration to `active_learning` for inference.
 
 ---
 
