@@ -80,14 +80,3 @@ The `active_learning` backend can be accessed through a set of helper functions 
    ```bash
    streamlit run app.py
    ```
-
----
-
-## Key Features
-- **Active Learning Backend**: Build and optimize ML models using a tabular dataset and customizable configurations.
-- **LLM-Driven Frontend**: Automate JSON configuration creation and streamline user input through an intuitive interface.
-- **Flexible Integration**: Helper functions allow seamless interaction between the backend and frontend, supporting extensibility for new LLMs or frontends.
-
----
-
-Feel free to contribute or raise issues if you encounter any problems. Happy optimizing!
