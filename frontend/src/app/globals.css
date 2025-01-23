@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-rgb: 250, 250, 250;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-rgb: 18, 18, 18;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+}
+
+.bg-white {
+  @apply dark:bg-zinc-900;
+}
+
+.text-gray-600 {
+  @apply dark:text-zinc-300;
+}
+
+.bg-gray-50 {
+  @apply dark:bg-zinc-800;
+}
+
+.border {
+  @apply border-zinc-200 dark:border-zinc-700;
+}
+
+/* Custom button styles */
+.btn-primary {
+  @apply bg-black text-white dark:bg-white dark:text-black px-4 py-2 rounded-md 
+         hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors;
+}
+
+.btn-secondary {
+  @apply bg-zinc-100 text-black dark:bg-zinc-800 dark:text-white px-4 py-2 rounded-md 
+         hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors;
+}
+
+/* Form input styles */
+.input-base {
+  @apply bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 
+         focus:ring-2 focus:ring-black dark:focus:ring-white focus:border-transparent;
+}
+
+/* Card styles */
+.card {
+  @apply bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-sm;
+}
