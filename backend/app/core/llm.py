@@ -57,7 +57,7 @@ async def generate_config(prompt: str) -> OptimizationConfig:
             raise ValueError("OPENAI_API_KEY environment variable is not set")
             
         response = await client.chat.completions.create(
-            model="gpt-4o-latest",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}

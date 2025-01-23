@@ -65,37 +65,34 @@ export default function Home() {
             <div className="space-y-4">
               <div>
                 <h3 className="font-medium">Objective Function</h3>
-                <p className="text-zinc-600 dark:text-zinc-300">{config.objective_function}</p>
+                <p className="text-zinc-600 dark:text-zinc-300">{config.objective}</p>
               </div>
               <div>
                 <h3 className="font-medium">Parameters</h3>
-                <ul className="list-disc list-inside text-zinc-600 dark:text-zinc-300">
-                  {config.parameters.map((param) => (
-                    <li key={param}>{param}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3 className="font-medium">Constraints</h3>
-                <ul className="list-disc list-inside text-zinc-600 dark:text-zinc-300">
-                  {config.constraints.map((constraint, i) => (
-                    <li key={i}>{constraint}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3 className="font-medium">Bounds</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {Object.entries(config.bounds).map(([param, [min, max]]) => (
-                    <div key={param} className="bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
-                      <p className="font-medium">{param}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {Object.entries(config.parameters).map(([name, param]) => (
+                    <div key={name} className="bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
+                      <p className="font-medium">{name}</p>
                       <p className="text-zinc-600 dark:text-zinc-300">
-                        [{min}, {max}]
+                        Range: [{param.min}, {param.max}]
+                      </p>
+                      <p className="text-zinc-600 dark:text-zinc-300">
+                        Type: {param.type}
                       </p>
                     </div>
                   ))}
                 </div>
               </div>
+              {config.constraints && config.constraints.length > 0 && (
+                <div>
+                  <h3 className="font-medium">Constraints</h3>
+                  <ul className="list-disc list-inside text-zinc-600 dark:text-zinc-300">
+                    {config.constraints.map((constraint, i) => (
+                      <li key={i}>{constraint}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         )}
