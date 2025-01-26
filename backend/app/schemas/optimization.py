@@ -5,8 +5,12 @@ class ConfigGenerationRequest(BaseModel):
     prompt: str = Field(..., description="Natural language prompt describing the optimization problem")
     
 class OptimizationConfig(BaseModel):
-    parameters: Dict[str, Dict[str, Any]] = Field(..., description="Parameter space configuration")
+    parameters: Dict[str, Dict[str, Union[float, str, Dict[str, Any]]]] = Field(
+        ..., 
+        description="Parameter space configuration including derived parameters"
+    )
     objective: str = Field(..., description="Objective function to optimize")
+    objective_variable: str = Field(..., description="Name of the variable being optimized")
     constraints: Optional[List[str]] = Field(default=None, description="Optional constraints")
     
 class DataPoint(BaseModel):

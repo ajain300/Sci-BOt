@@ -18,32 +18,54 @@ The configuration must follow this exact schema:
 {
     "parameters": {
         "parameter_name": {
-            "min": number,
-            "max": number,
-            "type": "continuous" | "discrete"
+            "min": number | "n/a",
+            "max": number | "n/a",
+            "type": "continuous" | "discrete" | "derived",
+            "derived_from": "optional string explaining how this parameter is derived"
         },
         ...
     },
     "objective": "string describing the objective function",
+    "objective_variable": "string name of the variable being optimized",
     "constraints": ["optional array of constraint strings"]
 }
+
+Important rules:
+1. Include ALL variables mentioned in constraints or the problem description in parameters
+2. For derived parameters (like those determined by constraints), use:
+   - type: "derived"
+   - min: "n/a"
+   - max: "n/a"
+   - derived_from: explanation of how it's derived
 
 Example:
 {
     "parameters": {
-        "temperature": {
-            "min": 20,
-            "max": 100,
+        "material_a_concentration": {
+            "min": 15,
+            "max": 35,
             "type": "continuous"
         },
-        "pressure": {
-            "min": 1,
-            "max": 10,
+        "material_b_concentration": {
+            "min": 15,
+            "max": 35,
+            "type": "continuous"
+        },
+        "material_c_concentration": {
+            "min": "n/a",
+            "max": "n/a",
+            "type": "derived",
+            "derived_from": "100 - material_a_concentration - material_b_concentration"
+        },
+        "temperature": {
+            "min": 35,
+            "max": 400,
             "type": "continuous"
         }
     },
-    "objective": "maximize reaction yield",
-    "constraints": ["temperature must not exceed pressure * 10"]
+    "objective": "maximize Young's modulus",
+    "objective_variable": "Young's modulus",
+    "constraints": ["material_a_concentration + material_b_concentration + material_c_concentration = 100"]
 }
 
 Format the response as valid JSON matching this schema exactly."""

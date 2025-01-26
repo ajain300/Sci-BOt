@@ -9,6 +9,7 @@ import { generateConfig } from "@/lib/api";
 import type { OptimizationConfig } from "@/lib/api";
 import ActiveLearning from "@/components/ActiveLearning";
 import DataAnalysis from "@/components/DataAnalysis";
+import CSVPreview from "@/components/CSVPreview";
 
 const formSchema = z.object({
   prompt: z.string().min(10, "Prompt must be at least 10 characters"),
@@ -68,17 +69,34 @@ export default function Home() {
                 <p className="text-zinc-600 dark:text-zinc-300">{config.objective}</p>
               </div>
               <div>
+                <h3 className="font-medium">Objective Variable</h3>
+                <p className="text-zinc-600 dark:text-zinc-300">{config.objective_variable}</p>
+              </div>
+              <div>
                 <h3 className="font-medium">Parameters</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {Object.entries(config.parameters).map(([name, param]) => (
                     <div key={name} className="bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
                       <p className="font-medium">{name}</p>
-                      <p className="text-zinc-600 dark:text-zinc-300">
-                        Range: [{param.min}, {param.max}]
-                      </p>
-                      <p className="text-zinc-600 dark:text-zinc-300">
-                        Type: {param.type}
-                      </p>
+                      {param.type === "derived" ? (
+                        <>
+                          <p className="text-zinc-600 dark:text-zinc-300">
+                            Type: {param.type}
+                          </p>
+                          <p className="text-zinc-600 dark:text-zinc-300">
+                            Derived from: {param.derived_from}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-zinc-600 dark:text-zinc-300">
+                            Range: [{param.min}, {param.max}]
+                          </p>
+                          <p className="text-zinc-600 dark:text-zinc-300">
+                            Type: {param.type}
+                          </p>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -99,6 +117,7 @@ export default function Home() {
 
         {config && (
           <>
+            <CSVPreview config={config} />
             <ActiveLearning config={config} />
             <DataAnalysis config={config} />
           </>
