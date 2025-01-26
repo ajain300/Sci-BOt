@@ -81,5 +81,5 @@ class ActiveLearningOptimizer:
         
         return ActiveLearningResponse(
             suggestions=self._convert_to_dict(X_random[indices]),
-            expected_improvements=ei[indices].tolist()
+            expected_improvements=ei[indices].ravel().tolist()
         ) 
