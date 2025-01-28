@@ -74,7 +74,6 @@ logs
 
 # Cache
 .cache/
-.next/
 .nuxt/
 .vuepress/dist
 .temp/
