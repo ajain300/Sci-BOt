@@ -19,5 +19,8 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "react-dropzone": "^14.3.5"
   }
-} 
+}
