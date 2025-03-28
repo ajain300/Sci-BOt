@@ -1,58 +1,126 @@
 from abc import ABC, abstractmethod
-import pandas as pd
-import numpy as np
-from typing import List, Dict
+from typing import List, Dict, Union, Optional
+from pydantic import BaseModel, Field
+import logging
+
+logger = logging.getLogger(__name__)
+
+class FeatureBase(BaseModel):
+    name: str
+    type: str
+
+class CompositionFeatureConfig(FeatureBase):
+    type: str = "composition"
+    columns: Dict[str, Union[List[str], Dict[str, List[float]]]] = Field(
+        ...,
+        description="Dictionary containing parts list and their ranges"
+    )
+
+class ContinuousFeatureConfig(FeatureBase):
+    type: str = "continuous"
+    min: float
+    max: float
+
+class DiscreteFeatureConfig(FeatureBase):
+    type: str = "discrete"
+    categories: List[Union[str, int, float]]
 
 class Feature(ABC):
-    def __init__(self, feature_config, data = None, X_columns = None, variable_info = None, properties = None, initial_columns = None):
-        self.name = feature_config['name']
+    def __init__(self, feature_config: Union[CompositionFeatureConfig, ContinuousFeatureConfig, DiscreteFeatureConfig]):
+        self.name = feature_config.name
         self.feature_config = feature_config
-        self.data = data
-        self.X_columns = X_columns
-        self.OH_columns = []
-        self.initial_columns = initial_columns if initial_columns else X_columns
-        self.variable_info = variable_info if variable_info else {}
-        self.properties = properties if properties else {}
+        self.X_columns: List[str] = []
 
     @abstractmethod
-    def process(self):
+    def process(self) -> None:
         pass
 
     def get_columns(self) -> List[str]:
         return self.X_columns
-    
-    # def set_columns(self, columns: List[str]):
-    #     self.X_columns = columns
 
 class CompositionFeature(Feature):
-    def process(self):
-        for col in self.X_columns:
-            self.variable_info[col] = {'scaling': self.feature_config.get('scaling', 'lin')}
+    def __init__(self, feature_config: CompositionFeatureConfig):
+        super().__init__(feature_config)
+        self.parts = feature_config.columns.parts
+        self.ranges = feature_config.columns.range
         
-class CorrelatedFeature(Feature):
-    def process(self):
-        pass
+    def process(self) -> None:
+        """Process composition feature"""
+        self.X_columns = self.parts
+        # Validate ranges
+        for part in self.parts:
+            if part not in self.ranges:
+                self.ranges[part] = [0, 100]
+            elif not isinstance(self.ranges[part], list) or len(self.ranges[part]) != 2:
+                raise ValueError(f"Invalid range for part {part}: {self.ranges[part]}")
+
+class ContinuousFeature(Feature):
+    def __init__(self, feature_config: ContinuousFeatureConfig):
+        super().__init__(feature_config)
+        self.min = feature_config.min
+        self.max = feature_config.max
+        
+    def process(self) -> None:
+        """Process continuous feature"""
+        self.X_columns = [self.name]
 
 class DiscreteFeature(Feature):
-    def process(self):
-        if 'requirements' not in self.feature_config:
-            self.feature_config['requirements'] = []
-        self.feature_config['requirements'].append({'allowed_values': self.feature_config['range']})
+    def __init__(self, feature_config: DiscreteFeatureConfig):
+        super().__init__(feature_config)
+        self.categories = feature_config.categories
+        
+    def process(self) -> None:
+        """Process discrete feature"""
+        self.X_columns = [self.name]
 
-class GeneralFeature(Feature):
-    def process(self):
-        columns = self.feature_config['columns']
-        if self.X_columns is not None:    
-            self.X_columns.extend(columns)
+def create_feature(config: Union[Dict, BaseModel]) -> Feature:
+    """Factory function to create appropriate feature object"""
+    if isinstance(config, dict):
+        if config["type"] == "composition":
+            return CompositionFeature(CompositionFeatureConfig(**config))
+        elif config["type"] == "continuous":
+            return ContinuousFeature(ContinuousFeatureConfig(**config))
+        elif config["type"] == "discrete":
+            return DiscreteFeature(DiscreteFeatureConfig(**config))
+    else:
+        if config.type == "composition":
+            return CompositionFeature(config)
+        elif config.type == "continuous":
+            return ContinuousFeature(config)
+        elif config.type == "discrete":
+            return DiscreteFeature(config)
+    
+    raise ValueError(f"Unknown feature type: {config['type']}")
+
+def extract_parameter_columns(features: List[FeatureBase]) -> List[str]:
+    """
+    Extract parameter column names from a list of feature objects.
+    
+    Args:
+        features: List of feature configuration objects
+        
+    Returns:
+        List of parameter column names
+        
+    Example:
+        >>> features = [
+        ...     CompositionFeatureConfig(
+        ...         name="composition",
+        ...         columns={"parts": ["A", "B"], "range": {"A": [0, 100], "B": [0, 100]}}
+        ...     ),
+        ...     ContinuousFeatureConfig(name="temperature", min=0, max=100),
+        ...     DiscreteFeatureConfig(name="catalyst", categories=["X", "Y", "Z"])
+        ... ]
+        >>> extract_parameter_columns(features)
+        ['A', 'B', 'temperature', 'catalyst']
+    """
+    parameter_cols = []
+    
+    
+    for feature in features:
+        if feature.type == 'composition':
+            parameter_cols.extend(feature.columns.parts)
         else:
-            self.X_columns = [columns]
-
-# Factory method to get the appropriate feature class
-def get_feature_class(feature_type: str):
-    feature_classes = {
-        'composition': CompositionFeature,
-        'correlated': CorrelatedFeature,
-        'fidelity': DiscreteFeature,
-        'general': GeneralFeature
-    }
-    return feature_classes.get(feature_type, GeneralFeature)
+            parameter_cols.append(feature.name)
+    
+    return parameter_cols

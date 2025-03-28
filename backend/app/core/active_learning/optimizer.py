@@ -1,85 +1,69 @@
 import numpy as np
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import RBF, ConstantKernel
-from scipy.stats import norm
 from typing import List, Dict, Tuple
 from ...schemas.optimization import OptimizationConfig, DataPoint, ActiveLearningResponse
+from ...core.active_learning.al_loop import Active_Learning_Loop
+from .dataset import AL_Dataset
+import logging
+import traceback
+
+logger = logging.getLogger("app.core.active_learning")
 
 class ActiveLearningOptimizer:
-    def __init__(self, config: OptimizationConfig):
+    def __init__(self, config: OptimizationConfig, data: List[DataPoint]):
         self.config = config
-        self.gp = GaussianProcessRegressor(
-            kernel=ConstantKernel() * RBF(),
-            n_restarts_optimizer=10,
-            random_state=42
+        print("in ActiveLearningOptimizer, config type:", type(config))
+        # Create AL_Dataset with the configuration
+        self.dataset = AL_Dataset(
+            data_config=config,
+            data=data
         )
         
-    def _convert_to_array(self, data_points: List[DataPoint]) -> Tuple[np.ndarray, np.ndarray]:
-        """Convert data points to numpy arrays for GP."""
-        X = []
-        y = []
-        param_names = list(self.config.parameters.keys())
+        # Initialize ActiveLearningLoop with the dataset
+        self.active_learning_loop = Active_Learning_Loop(
+            data=self.dataset,
+            rec_type=config.acquisition_function,  # or 'diversity_uncertainty' based on your needs
+            model_type='GPR'
+        )
+    
+    async def get_suggestions(self, n_suggestions: int = 1) -> ActiveLearningResponse:
+        """Get next points to evaluate based on active learning strategy."""
+        try:
+            logger.debug("Processing data")
+            self.dataset.process_data()
         
-        for point in data_points:
-            X.append([point.parameters[name] for name in param_names])
-            y.append(point.objective_value)
+            logger.debug("Getting AL suggestions using run_Loop")
             
-        return np.array(X), np.array(y)
-    
-    def _convert_to_dict(self, X: np.ndarray) -> List[Dict[str, float]]:
-        """Convert numpy array back to dictionary format."""
-        param_names = list(self.config.parameters.keys())
-        return [{name: float(x[i]) for i, name in enumerate(param_names)} for x in X]
-    
-    def _expected_improvement(self, X: np.ndarray, xi: float = 0.01) -> np.ndarray:
-        """Calculate expected improvement at points X."""
-        mu, sigma = self.gp.predict(X, return_std=True)
-        mu = mu.reshape(-1, 1)
-        sigma = sigma.reshape(-1, 1)
-        
-        mu_sample = self.gp.predict(self.X_train)
-        mu_sample_opt = np.min(mu_sample)
-        
-        imp = mu_sample_opt - mu - xi
-        Z = imp / sigma
-        ei = imp * norm.cdf(Z) + sigma * norm.pdf(Z)
-        ei[sigma == 0.0] = 0.0
-        
-        return ei
-    
-    async def get_suggestions(self, data: List[DataPoint], n_suggestions: int = 1) -> ActiveLearningResponse:
-        """Get next points to evaluate based on expected improvement."""
-        if not data:
-            # If no data, return random suggestions
+            # Get recommendations using run_Loop directly
+            recommendations_df = self.active_learning_loop.run_Loop(n_suggestions=n_suggestions)
+            
+            # Convert recommendations DataFrame to required format
             suggestions = []
-            for _ in range(n_suggestions):
-                point = {}
-                for name, param in self.config.parameters.items():
-                    point[name] = np.random.uniform(param["min"], param["max"])
-                suggestions.append(point)
+            expected_improvements = []
+            
+            # Get parameter columns (excluding mean and std columns)
+            param_cols = [col for col in recommendations_df.columns 
+                         if not (col.endswith('_mean') or col.endswith('_std'))]
+            
+            # Convert each row to a suggestion dictionary
+            logger.info(f"recommendations_df: {recommendations_df.to_string()}")
+            logger.debug(f"param_cols: {param_cols}")
+            for _, row in recommendations_df.iterrows():
+                logger.debug(f"row: {row}")
+                suggestion = {param: float(row[param]) for param in param_cols}
+                suggestions.append(suggestion)
+                
+                # Get the expected improvement (using mean prediction)
+                if 'objective_mean' in recommendations_df.columns:
+                    expected_improvements.append(float(row['objective_mean']))
+                else:
+                    expected_improvements.append(0.0)
+            
             return ActiveLearningResponse(
                 suggestions=suggestions,
-                expected_improvements=[0.0] * n_suggestions
+                expected_improvements=expected_improvements
             )
-        
-        # Convert data to arrays and fit GP
-        self.X_train, self.y_train = self._convert_to_array(data)
-        self.gp.fit(self.X_train, self.y_train)
-        
-        # Generate random candidates and select best by EI
-        n_random = 1000
-        X_random = []
-        for _ in range(n_random):
-            point = []
-            for name, param in self.config.parameters.items():
-                point.append(np.random.uniform(param["min"], param["max"]))
-            X_random.append(point)
-        X_random = np.array(X_random)
-        
-        ei = self._expected_improvement(X_random)
-        indices = np.argsort(ei.ravel())[-n_suggestions:]
-        
-        return ActiveLearningResponse(
-            suggestions=self._convert_to_dict(X_random[indices]),
-            expected_improvements=ei[indices].ravel().tolist()
-        ) 
+            
+        except Exception as e:
+            logger.error(f"Error in get_suggestions: {str(e)}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+            raise

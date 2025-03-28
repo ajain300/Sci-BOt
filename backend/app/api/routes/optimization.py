@@ -11,8 +11,14 @@ from ...schemas.optimization import (
 from ...core.llm import generate_config
 from ...core.active_learning import ActiveLearningOptimizer
 from ...core.data_processing import analyze_data
+from ...core.logging_config import setup_logging
 import io
+import logging
 import csv
+import traceback
+
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/optimization", tags=["optimization"])
 
@@ -50,14 +56,21 @@ async def get_csv_template(config: OptimizationConfig):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/suggest", response_model=ActiveLearningResponse)
-async def get_suggestions(request: ActiveLearningRequest):
-    """Get next points to evaluate using active learning."""
+async def get_suggestions(request: ActiveLearningRequest) -> ActiveLearningResponse:
     try:
-        optimizer = ActiveLearningOptimizer(request.config)
-        response = await optimizer.get_suggestions(request.data, request.n_suggestions)
+        optimizer = ActiveLearningOptimizer(request.config, request.data)
+        response = await optimizer.get_suggestions(request.n_suggestions)
         return response
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error in get_suggestions: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+        )
 
 @router.post("/analyze", response_model=ProcessDataResponse)
 async def process_data(request: ProcessDataRequest):

@@ -3,8 +3,8 @@ from typing import Dict, Any
 import json
 import os
 import logging
-from ..schemas.optimization import OptimizationConfig
-
+from ..schemas.optimization import OptimizationConfig, ObjectiveConfig
+from ..schemas.feature_schemas import CompositionFeatureConfig, ContinuousFeatureConfig, DiscreteFeatureConfig
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,19 +20,27 @@ The configuration must follow this exact schema:
         "parameter_name": {
             "min": number | "n/a",
             "max": number | "n/a",
-            "type": "continuous" | "discrete" | "derived",
+            "type": "composition" | "continuous" | "discrete",
             "derived_from": "optional string explaining how this parameter is derived"
         },
         ...
     },
-    "objective": "string describing the objective function",
-    "objective_variable": "string name of the variable being optimized",
+    "objectives": [
+        {
+            "name": "string describing the objective function",
+            "direction": "maximize" | "minimize" | "target" | "range",
+            "target_value": "optional number for target optimization",
+            "range_min": "optional number for range optimization",
+            "range_max": "optional number for range optimization"
+        },
+        ...
+    ],
     "constraints": ["optional array of constraint strings"]
 }
 
 Important rules:
 1. Include ALL variables mentioned in constraints or the problem description in parameters
-2. For derived parameters (like those determined by constraints), use:
+2. For derived features (like those determined by constraints), use:
    - type: "derived"
    - min: "n/a"
    - max: "n/a"
@@ -65,6 +73,7 @@ Example:
     },
     "objective": "maximize Young's modulus",
     "objective_variable": "Young's modulus",
+    "acquisition_function": "diversity_uncertainty",
     "constraints": ["material_a_concentration + material_b_concentration + material_c_concentration = 100"]
 }
 
@@ -90,8 +99,40 @@ async def generate_config(prompt: str) -> OptimizationConfig:
         content = response.choices[0].message.content
         logger.info(f"Received response: {content}")
         
-        config_dict = json.loads(content)
-        return OptimizationConfig(**config_dict)
+        raw_config = json.loads(content)
+        
+        # Transform the parameters into features with proper structure
+        features = {}
+        for name, params in raw_config["parameters"].items():
+            features[name] = FeatureConfig(
+                name=name,
+                min=params["min"],
+                max=params["max"],
+                type=params["type"],
+                derived_from=params.get("derived_from")
+            )
+        
+        # Create the objectives list
+        objectives = []
+        if isinstance(raw_config.get("objectives"), list):
+            objectives = raw_config["objectives"]
+        else:
+            # Handle legacy format with single objective
+            objectives = [{
+                "name": raw_config.get("objective", ""),
+                "direction": "maximize" if raw_config.get("objective", "").lower().startswith("maximize") else "minimize",
+                "weight": 1.0
+            }]
+        
+        # Construct the final config
+        config = OptimizationConfig(
+            features=features,
+            objectives=[ObjectiveConfig(**obj) for obj in objectives],
+            acquisition_function=raw_config.get("acquisition_function", "diversity_uncertainty"),
+            constraints=raw_config.get("constraints")
+        )
+        
+        return config
         
     except Exception as e:
         logger.error(f"Error generating configuration: {str(e)}", exc_info=True)

@@ -6,12 +6,15 @@ from .acquisition import *
 from .models import GaussianProcessModel
 import logging
 import os
+from typing import List, Tuple, Dict
+from ...schemas.optimization import DataPoint
 
 # logger = logging.getLogger(__name__)
 
 class Active_Learning_Loop:
     rec_to_acq_func = {'diversity_uncertainty': Diversity_Batch,
-                       'best_score': NaiveMOFunction}
+                       'best_score': NaiveMOFunction,
+                       }
     model_type_to_obj = {'GPR': GaussianProcessModel}
     
     def __init__(self, data : AL_Dataset, 
@@ -62,6 +65,7 @@ class Active_Learning_Loop:
                                                        **kwargs)
 
         recs, sample_mean, sample_std = acq_func.recommend(**kwargs)
+        logger.info(f"recs: {recs}")
         recs = self.dataset.make_rec_readable(recs)
 
         for prop, preds in sample_mean.items():
@@ -69,3 +73,48 @@ class Active_Learning_Loop:
             recs[prop + '_std'] = sample_std[prop]
 
         return recs
+
+    async def get_suggestions(self, data: List[DataPoint], n_suggestions: int) -> Tuple[List[Dict[str, float]], List[float]]:
+        """Convert input data to AL_Dataset format and get suggestions using run_Loop."""
+        # Convert input data to format needed by AL_Dataset
+        param_data = {}
+        objective_data = {}
+        
+        for point in data:
+            for param_name, value in point.parameters.items():
+                if param_name not in param_data:
+                    param_data[param_name] = []
+                param_data[param_name].append(value)
+            
+            objective_data['objective'] = point.objective_values
+        
+        # Create DataFrame from the data
+        param_df = pd.DataFrame(param_data)
+        objective_df = pd.DataFrame(objective_data)
+        
+        # Update dataset with new data
+        self.dataset.update_data(param_df, objective_df)
+        
+        # Get recommendations using run_Loop
+        recommendations_df = self.run_Loop(n_suggestions=n_suggestions)
+        
+        # Convert recommendations DataFrame to required format
+        suggestions = []
+        expected_improvements = []
+        
+        # Get parameter columns (excluding mean and std columns)
+        param_cols = [col for col in recommendations_df.columns 
+                     if not (col.endswith('_mean') or col.endswith('_std'))]
+        
+        # Convert each row to a suggestion dictionary
+        for _, row in recommendations_df.iterrows():
+            suggestion = {param: float(row[param]) for param in param_cols}
+            suggestions.append(suggestion)
+            
+            # Get the expected improvement (using mean prediction)
+            if 'objective_mean' in recommendations_df.columns:
+                expected_improvements.append(float(row['objective_mean']))
+            else:
+                expected_improvements.append(0.0)
+                
+        return suggestions[:n_suggestions], expected_improvements[:n_suggestions]

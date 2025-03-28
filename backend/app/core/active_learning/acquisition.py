@@ -2,7 +2,7 @@ from typing import List, Tuple, Dict
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances_argmin_min
-from .utils import k_medoids
+from .utils.k_medoids import k_medoids
 import pandas as pd
 import logging
 
@@ -13,13 +13,12 @@ from .targets import Target
 
 logger = logging.getLogger(__name__)
 
-class AcquisitionFunction: 
-    def __init__(self, model : BaseModel, dataset : AL_Dataset, **kwargs):
+class AcquisitionFunction:
+    def __init__(self, model: BaseModel, dataset: AL_Dataset, targets: Dict[str, Target] = None, **kwargs):
         self.model = model
         self.dataset = dataset
+        self.targets = targets if targets else dataset.targets
         self.kwargs = kwargs
-        
-        self.logger = kwargs.get('logger', logging.getLogger(__name__))
         
     
     def recommend(self, X, model, **kwargs):
@@ -35,7 +34,7 @@ class AcquisitionFunction:
         std = {}
         if property is None:
             for target_name, target_obj in self.dataset.targets.items():
-                self.logger.info(f"Predicting outputs for property: {target_obj.name}")
+                logger.info(f"Predicting outputs for property: {target_obj.name}")
                 m, s = self.model.inference(candidates.copy(), property = target_obj.name)
                 mean[target_obj.name] = m
                 std[target_obj.name] = s
@@ -49,9 +48,8 @@ class AcquisitionFunction:
 class Diversity_Batch(AcquisitionFunction):
     def __init__(self, model : BaseModel, dataset : AL_Dataset, **kwargs):
         super().__init__(model, dataset, **kwargs)
-        self.logger.info("Initializing Diversity_Batch acquisition function.")
+        logger.info("Initializing Diversity_Batch acquisition function.")
 
-    
     def recommend(self, N_samples = 10, beta = 0.25, property = None, **kwargs):
         """
         Implements DMB AL acquisition from https://arxiv.org/pdf/1901.05954
@@ -91,8 +89,13 @@ class Diversity_Batch(AcquisitionFunction):
         acq_sample_mean = {}
         acq_sample_std = {}
         for prop, preds in mean.items():
-            acq_sample_mean[prop], acq_sample_std[prop] = mean[prop][closest_index], std_dict[prop][closest_index] 
-
+            target = self.targets[prop]
+            mean[prop], std_dict[prop] = self.dataset.unnormalize(
+                preds, 
+                target.X_columns[0],
+                data_std=std_dict[prop] ** 0.5
+            )
+            
         self.acq_stats = {
             'avg_mean': {prop: np.mean(preds) for prop, preds in mean.items()},
             'max_mean': {prop: np.max(preds) for prop, preds in mean.items()},
@@ -108,7 +111,7 @@ class NaiveMOFunction(AcquisitionFunction):
     def __init__(self, model: BaseModel, dataset: AL_Dataset, targets: Dict[str, Target], **kwargs):
         super().__init__(model, dataset, **kwargs)
         self.targets = targets
-        self.logger.info("Initializing NaiveMOFunction acquisition function.")
+        logger.info("Initializing NaiveMOFunction acquisition function.")
 
     def get_score(self, predictions_dict : Dict[str, np.ndarray]) -> float:
         total_score = 0
@@ -126,7 +129,7 @@ class NaiveMOFunction(AcquisitionFunction):
         for prop, preds in mean.items():
             mean[prop], std[prop] = self.dataset.unnormalize(preds, self.targets[prop].X_columns[0], data_std = std[prop])
         
-        self.logger.info(f"mean_pred: {mean}")
+        logger.info(f"mean_pred: {mean}")
         score = np.zeros_like(list(mean.values())[0])
         for target_name, target in self.targets.items():
 
@@ -138,7 +141,7 @@ class NaiveMOFunction(AcquisitionFunction):
             # print(max(target.score(mean[target_name], std[target_name])))
             score += target.score(mean[target_name], std[target_name])
 
-        self.logger.info(f"score {score}")
+        logger.info(f"score {score}")
 
         top_ind = np.argsort(score)[-N_samples:]
         # print(candidates)
@@ -167,7 +170,7 @@ class Score_Diversity_Batch(AcquisitionFunction):
     def __init__(self, model: BaseModel, dataset: AL_Dataset, targets: Dict[str, Target], **kwargs):
         super().__init__(model, dataset, **kwargs)
         self.targets = targets
-        self.logger.info("Initializing NaiveMOFunction acquisition function.")
+        logger.info("Initializing NaiveMOFunction acquisition function.")
 
     def get_score(self, predictions_dict : Dict[str, np.ndarray]) -> float:
         total_score = 0

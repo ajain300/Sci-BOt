@@ -1,7 +1,7 @@
 import pytest
 from httpx import AsyncClient
-from ..app.main import app
-from ..app.schemas.optimization import OptimizationConfig
+from backend.app.main import app
+from backend.app.schemas.optimization import OptimizationConfig
 
 @pytest.mark.asyncio
 async def test_generate_config():

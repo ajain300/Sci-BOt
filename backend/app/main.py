@@ -8,8 +8,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import Dict
+from .core.logging_config import setup_logging
 
 from .api.routes import optimization
+
+# Setup logging before creating the app
+setup_logging()
 
 app = FastAPI(
     title="Sci-Opt API",

@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 # Suppress only ConvergenceWarning
 warnings.filterwarnings(action='ignore', category=ConvergenceWarning)
 
+logger = logging.getLogger(__name__)
+
 class BaseModel:
     def train(self, X, y):
         # Placeholder for training logic
@@ -34,7 +36,7 @@ class GaussianProcessModel(BaseModel):
             raise ValueError(f"Invalid kwargs provided: {', '.join(invalid_kwargs)}")
         
         # Define the kernel
-        self.kernel = kwargs.get('kernel_function', RBF() + WhiteKernel(noise_level_bounds=(1e-6, 1e-1)))
+        self.kernel = kwargs.get('kernel_function', RBF() + WhiteKernel(noise_level_bounds=(1e-6, 1e-2)))
         # Check if provided kernel is a valid kernel function
         if not isinstance(self.kernel, Kernel):
             raise ValueError("Invalid kernel_function provided.")
@@ -50,6 +52,9 @@ class GaussianProcessModel(BaseModel):
 
     def train(self, **kwargs):
         X_train, Y, Y_std = self.dataset.get_training_format()
+        logger.info(f"X_train: {X_train}")
+        logger.info(f"Y: {Y}")
+        logger.info(f"Y_std: {Y_std}")
         return self._train(X_train, Y, y_var = Y_std, **kwargs)
     
     def _train(self, X, y, y_var = 1e-5, **kwargs):
