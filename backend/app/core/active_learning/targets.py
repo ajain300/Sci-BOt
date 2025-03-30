@@ -3,32 +3,8 @@ from typing import List, Dict, Optional, Any, Union
 from pydantic import BaseModel, Field
 import pandas as pd
 import numpy as np
-from backend.app.schemas.optimization import OptimizationDirection
-
-class TargetBase(BaseModel):
-    name: str
-    weight: float
-    scaling: Optional[str] = None
-    unit: Optional[str] = None
-
-class UncertaintyTargetConfig(TargetBase):
-    type: str = "uncertainty"
-    direction: str = Field(..., pattern="^(MIN|MAX)$")
-
-class ExtremeTargetConfig(TargetBase):
-    type: str = "extreme"
-    direction: str = Field(..., pattern="^(MIN|MAX)$")
-
-class ValueTargetConfig(TargetBase):
-    type: str = "target"
-    direction: str = "TARGET"
-    target_value: float
-
-class RangeTargetConfig(TargetBase):
-    type: str = "range"
-    direction: str = "RANGE"
-    range_min: float
-    range_max: float
+from ...schemas.optimization import OptimizationDirection
+from ...schemas.target_schemas import *
 
 class Target(ABC):
     def __init__(

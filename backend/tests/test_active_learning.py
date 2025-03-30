@@ -4,11 +4,10 @@ from backend.app.main import app
 from backend.app.schemas.optimization import OptimizationConfig, DataPoint
 from backend.app.utils.serialization import convert_config_to_dict, convert_data_points_to_dict
 
-TEST_CONFIG_JSON = TEST_CONFIG_JSON = {
+TEST_CONFIG_JSON = {
     "features": [
         # Composition feature for materials
-        {
-            "name": "material_composition",
+        { "name": "material_composition",
             "type": "composition",
             "columns": {
                 "parts": [

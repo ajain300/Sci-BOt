@@ -11,6 +11,8 @@ from .dataset import AL_Dataset
 from .models import GaussianProcessModel, BaseModel
 from .targets import Target
 
+# TODO MUST ADD qNEHVI implementation, check botorch compatitbility
+
 logger = logging.getLogger(__name__)
 
 class AcquisitionFunction:

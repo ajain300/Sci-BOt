@@ -15,8 +15,8 @@ from .targets import *
 from .features import *
 import warnings
 
-from backend.app.schemas.optimization import OptimizationConfig, DataPoint, OptimizationDirection
-from backend.app.schemas.feature_schemas import *
+from ...schemas.optimization import OptimizationConfig, DataPoint, OptimizationDirection
+from ...schemas.feature_schemas import *
 
 logger = logging.getLogger(__name__)
 
@@ -325,7 +325,6 @@ class AL_Dataset:
         # Instead of using pivot_table, we'll use groupby and unstack to avoid memory issues
         grouped = melted.groupby(self.X_columns + ['Y_variable', 'is_std'])['Value'].first().unstack()
         data = grouped.reset_index()
-        print(data)
         
         # Pivoting the table to wide format to separate value and variance       
         data = data.dropna(subset = ["Y_value"]).reset_index(drop = True)

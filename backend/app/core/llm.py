@@ -4,7 +4,9 @@ import json
 import os
 import logging
 from ..schemas.optimization import OptimizationConfig, ObjectiveConfig
-from ..schemas.feature_schemas import CompositionFeatureConfig, ContinuousFeatureConfig, DiscreteFeatureConfig
+from ..schemas.feature_schemas import *
+from ..schemas.target_schemas import *
+from ..core.config_generator.parser import ConfigurationParser
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,66 +17,116 @@ SYSTEM_PROMPT = """You are an expert in scientific optimization and experimental
 Your task is to convert natural language descriptions of optimization problems into structured JSON configurations.
 The configuration must follow this exact schema:
 
-{
-    "parameters": {
-        "parameter_name": {
-            "min": number | "n/a",
-            "max": number | "n/a",
-            "type": "composition" | "continuous" | "discrete",
-            "derived_from": "optional string explaining how this parameter is derived"
-        },
-        ...
+"features": {
+    "feature_name": {
+        "min": number | "n/a",
+        "max": number | "n/a",
+        "type": "composition" | "continuous" | "discrete",
+        "derived_from": "optional string explaining how this parameter is derived, based on the context of the problem"
     },
+    ...
+}     "name": "feature_name",
+            "type": "continuous",
+            "min": number,
+            "max": number,
+            "scaling": "lin"
+        },
+        {
+            "name": "another_feature",
+            "type": "discrete",
+            "categories": ["option1", "option2", "option3"]
+        },
+        {
+            "name": "composition_feature",
+            "type": "composition",
+            "columns": {
+                "parts": ["component1", "component2", "component3"],
+                "range": {
+                    "component1": [min_value, max_value],
+                    "component2": [min_value, max_value],
+                    "component3": [min_value, max_value]
+                }
+            },
+            "scaling": "lin"
+        }
+    ],
     "objectives": [
         {
             "name": "string describing the objective function",
             "direction": "maximize" | "minimize" | "target" | "range",
-            "target_value": "optional number for target optimization",
-            "range_min": "optional number for range optimization",
-            "range_max": "optional number for range optimization"
-        },
-        ...
+            "weight": number,
+            "target_value": number (optional, for target optimization),
+            "range_min": number (optional, for range optimization),
+            "range_max": number (optional, for range optimization),
+            "unit": string (optional),
+            "scaling": string (optional)
+        }
     ],
-    "constraints": ["optional array of constraint strings"]
+    "acquisition_function": "diversity_uncertainty" | "best_score",
+    "constraints": ["constraint1", "constraint2"]
 }
 
+
 Important rules:
-1. Include ALL variables mentioned in constraints or the problem description in parameters
-2. For derived features (like those determined by constraints), use:
-   - type: "derived"
-   - min: "n/a"
-   - max: "n/a"
-   - derived_from: explanation of how it's derived
+1. Features must be a LIST of objects, not a dictionary
+2. Each feature must have a "name" and "type" field
+3. For continuous features, include "min" and "max" values
+4. For discrete features, include a "categories" array
+5. For composition features, include "columns" with "parts" and "range"
+6. All objectives must have a "name" and "direction" field
+7. Determine the acquisition function based on the problem, if the goal is exploration, use "diversity_uncertainty", if the goal is to optimize, use "best_score".
 
 Example:
 {
-    "parameters": {
-        "material_a_concentration": {
-            "min": 15,
-            "max": 35,
-            "type": "continuous"
+    "features": [
+        { 
+            "name": "material_composition",
+            "type": "composition",
+            "columns": {
+                "parts": [
+                    "material_a_concentration",
+                    "material_b_concentration",
+                    "material_c_concentration"
+                ],
+                "range": {
+                    "material_a_concentration": [15.0, 35.0],
+                    "material_b_concentration": [15.0, 35.0],
+                    "material_c_concentration": [30.0, 70.0]
+                }
+            },
+            "scaling": "lin"
         },
-        "material_b_concentration": {
-            "min": 15,
-            "max": 35,
-            "type": "continuous"
+        {
+            "name": "temperature",
+            "type": "continuous",
+            "min": 20.0,
+            "max": 100.0,
+            "scaling": "lin"
         },
-        "material_c_concentration": {
-            "min": "n/a",
-            "max": "n/a",
-            "type": "derived",
-            "derived_from": "100 - material_a_concentration - material_b_concentration"
-        },
-        "temperature": {
-            "min": 35,
-            "max": 400,
-            "type": "continuous"
+        {
+            "name": "pressure",
+            "type": "continuous",
+            "min": 1.0,
+            "max": 10.0,
+            "scaling": "lin"
         }
-    },
-    "objective": "maximize Young's modulus",
-    "objective_variable": "Young's modulus",
+    ],
+    "objectives": [
+        {
+            "name": "reaction_yield",
+            "direction": "maximize",
+            "weight": 1.0
+        },
+        {
+            "name": "cost",
+            "direction": "minimize",
+            "weight": 1.0
+        }
+    ],
     "acquisition_function": "diversity_uncertainty",
-    "constraints": ["material_a_concentration + material_b_concentration + material_c_concentration = 100"]
+    "constraints": [
+        "material_a_concentration + material_b_concentration + material_c_concentration = 100"
+    ]
 }
 
 Format the response as valid JSON matching this schema exactly."""
@@ -88,7 +140,7 @@ async def generate_config(prompt: str) -> OptimizationConfig:
             raise ValueError("OPENAI_API_KEY environment variable is not set")
             
         response = await client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
@@ -101,39 +153,21 @@ async def generate_config(prompt: str) -> OptimizationConfig:
         
         raw_config = json.loads(content)
         
-        # Transform the parameters into features with proper structure
-        features = {}
-        for name, params in raw_config["parameters"].items():
-            features[name] = FeatureConfig(
-                name=name,
-                min=params["min"],
-                max=params["max"],
-                type=params["type"],
-                derived_from=params.get("derived_from")
-            )
-        
-        # Create the objectives list
-        objectives = []
-        if isinstance(raw_config.get("objectives"), list):
-            objectives = raw_config["objectives"]
-        else:
-            # Handle legacy format with single objective
-            objectives = [{
-                "name": raw_config.get("objective", ""),
-                "direction": "maximize" if raw_config.get("objective", "").lower().startswith("maximize") else "minimize",
-                "weight": 1.0
-            }]
+        # Use ConfigurationParser to parse features and objectives
+        parser = ConfigurationParser()
+        features = parser.parse_llm_features(raw_config["features"])
+        objectives = parser.parse_llm_objectives(raw_config["objectives"])
         
         # Construct the final config
         config = OptimizationConfig(
             features=features,
-            objectives=[ObjectiveConfig(**obj) for obj in objectives],
+            objectives=objectives,
             acquisition_function=raw_config.get("acquisition_function", "diversity_uncertainty"),
-            constraints=raw_config.get("constraints")
+            constraints=raw_config.get("constraints", [])
         )
         
         return config
         
     except Exception as e:
         logger.error(f"Error generating configuration: {str(e)}", exc_info=True)
-        raise ValueError(f"Failed to generate configuration: {str(e)}") 
+        raise ValueError(f"Failed to generate configuration: {str(e)}")
