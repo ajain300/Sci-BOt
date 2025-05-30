@@ -4,6 +4,9 @@ from backend.app.main import app
 from backend.app.schemas.optimization import OptimizationConfig, DataPoint
 from backend.app.utils.serialization import convert_config_to_dict, convert_data_points_to_dict
 
+import logging
+logger = logging.getLogger(__name__)
+
 TEST_CONFIG_JSON = {
     "features": [
         # Composition feature for materials
@@ -37,7 +40,13 @@ TEST_CONFIG_JSON = {
             "min": 1.0,
             "max": 10.0,
             "scaling": "lin"
-        }
+        },
+        # Discrete features
+        {
+            "name": "atmosphere",
+            "type": "discrete",
+            "categories": ["air", "nitrogen"]
+        },
     ],
     "objectives": [
         {
@@ -51,7 +60,7 @@ TEST_CONFIG_JSON = {
             "weight": 1.0
         }
     ],
-    "acquisition_function": "diversity_uncertainty",
+    "acquisition_function": "combined_single_ei",
     "constraints": [
         "material_a_concentration + material_b_concentration + material_c_concentration = 100"
     ]
@@ -67,7 +76,8 @@ TEST_DATA_POINTS = [
             "material_b_concentration": 25.0,
             "material_c_concentration": 50.0,
             "temperature": 50.0,
-            "pressure": 5.0
+            "pressure": 5.0,
+            "atmosphere": "air"
         },
         objective_values={
             "reaction_yield": 0.75,
@@ -80,7 +90,8 @@ TEST_DATA_POINTS = [
             "material_b_concentration": 20.0,
             "material_c_concentration": 50.0,
             "temperature": 75.0,
-            "pressure": 7.0
+            "pressure": 7.0,
+            "atmosphere": "nitrogen"
         },
         objective_values={
             "reaction_yield": 0.85,
@@ -93,7 +104,8 @@ TEST_DATA_POINTS = [
             "material_b_concentration": 30.0,
             "material_c_concentration": 40.0,
             "temperature": 40.0,
-            "pressure": 10.0
+            "pressure": 10.0,
+            "atmosphere": "nitrogen"
         },
         objective_values={
             "reaction_yield": 0.35,
@@ -106,7 +118,8 @@ TEST_DATA_POINTS = [
         "material_b_concentration": 30.0,
         "material_c_concentration": 50.0,
         "temperature": 60.0,
-        "pressure": 6.0
+        "pressure": 6.0,
+        "atmosphere": "nitrogen"
     },
     objective_values={
         "reaction_yield": 0.65,
@@ -119,7 +132,8 @@ TEST_DATA_POINTS = [
             "material_b_concentration": 25.0,
             "material_c_concentration": 40.0,
             "temperature": 80.0,
-            "pressure": 8.0
+            "pressure": 8.0,
+            "atmosphere": "nitrogen"
         },
         objective_values={
             "reaction_yield": 0.92,
@@ -162,6 +176,7 @@ async def test_get_suggestions_with_data():
     data_points_dict = convert_data_points_to_dict(TEST_DATA_POINTS)
     
     print("config_dict type:", type(config_dict))
+    logger.debug(f"config_dict: {config_dict}")
     
     request_data = {
         "config": config_dict,

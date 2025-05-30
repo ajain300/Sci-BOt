@@ -13,6 +13,7 @@ class AcquisitionFunction(str, Enum):
     EXPECTED_IMPROVEMENT = "expected_improvement"
     DIVERSITY_UNCERTAINTY = "diversity_uncertainty"
     BEST_SCORE = "best_score"
+    COMBINED_SINGLE_EI = "combined_single_ei"
 
 ## BASE MODELS TO DEFINE THE STRUCTURE OF THE CONFIGURATION
 class ConfigGenerationRequest(BaseModel):
@@ -72,7 +73,7 @@ class OptimizationConfig(BaseModel):
     constraints: Optional[List[str]] = Field(default=None, description="Optional constraints")
     
 class DataPoint(BaseModel):
-    parameters: Dict[str, float] = Field(..., description="Parameter values")
+    parameters: Dict[str, float | str] = Field(..., description="Parameter values")
     objective_values: Dict[str, float] = Field(
         ...,  # Make it required instead of optional
         description="Measured objective values keyed by objective name"
@@ -83,9 +84,18 @@ class ActiveLearningRequest(BaseModel):
     data: List[DataPoint] = Field(default_factory=list, description="Historical data points")
     n_suggestions: int = Field(default=1, description="Number of parameter suggestions to generate")
     
+class Suggestion(BaseModel):
+    rank: int = Field(..., description="Rank of this suggestion")
+    suggestion: Dict[str, float | str] = Field(..., description="Suggested parameter values to try")
+    predictions: List[Dict[str, float | str]] = Field(..., description="Predicted objective values")
+    reason: str = Field(..., description="Explanation for this suggestion")
+
+class SuggestionsResponse(BaseModel):
+    suggestions: List[Suggestion] = Field(..., description="Ranked and explained suggestions")
+
 class ActiveLearningResponse(BaseModel):
-    suggestions: List[Dict[str, float]] = Field(..., description="Suggested parameter values to try")
-    expected_improvements: List[float] = Field(..., description="Expected improvement for each suggestion")
+    suggestions: List[Dict[str, float | str]] = Field(..., description="Suggested parameter values to try")
+    scores: List[List[Dict[str, float | str]]] = Field(..., description="Expected improvement for each suggestion")
     
 class ProcessDataRequest(BaseModel):
     config: OptimizationConfig
@@ -94,4 +104,11 @@ class ProcessDataRequest(BaseModel):
 class ProcessDataResponse(BaseModel):
     statistics: Dict[str, Any] = Field(..., description="Statistical analysis of the data")
     best_point: DataPoint = Field(..., description="Best performing point found")
-    parameter_importance: Dict[str, float] = Field(..., description="Relative importance of each parameter") 
+    parameter_importance: Dict[str, float] = Field(..., description="Relative importance of each parameter")
+
+
+class ConfigUpdateRequest(BaseModel):
+    type: str
+    id: str
+    property: str
+    value: float 

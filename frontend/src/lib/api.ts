@@ -1,17 +1,51 @@
 import axios from "axios";
 import { API_BASE_URL } from "./utils";
 
-export interface OptimizationConfig {
-  parameters: {
-    [key: string]: {
-      min: number | "n/a";
-      max: number | "n/a";
-      type: "continuous" | "discrete" | "derived";
-      derived_from?: string;
+type OptimizationDirection = "maximize" | "minimize" | "target" | "range";
+type AcquisitionFunction = "expected_improvement" | "diversity_uncertainty" | "best_score" | "combined_single_ei";
+
+interface BaseFeature {
+  name: string;
+  type: string;
+  scaling?: string;
+}
+
+interface ContinuousFeature extends BaseFeature {
+  type: "continuous";
+  min: number;
+  max: number;
+}
+
+interface DiscreteFeature extends BaseFeature {
+  type: "discrete";
+  categories: string[];
+}
+
+interface CompositionFeature extends BaseFeature {
+  type: "composition";
+  columns: {
+    parts: string[];
+    range: {
+      [key: string]: [number, number];
     };
   };
-  objective: string;
-  objective_variable: string;
+}
+
+export interface ObjectiveConfig {
+  name: string;
+  weight: number;
+  direction: OptimizationDirection;
+  target_value?: number;
+  range_min?: number;
+  range_max?: number;
+  unit?: string;
+  scaling?: string;
+}
+
+export interface OptimizationConfig {
+  features: Array<ContinuousFeature | DiscreteFeature | CompositionFeature>;
+  objectives: ObjectiveConfig[];
+  acquisition_function: AcquisitionFunction;
   constraints?: string[];
 }
 
@@ -22,38 +56,56 @@ export interface ConfigGenerationRequest {
 export interface ActiveLearningRequest {
   config: OptimizationConfig;
   data: Array<{
-    parameters: { [key: string]: number };
-    objective_value: number;
+    parameters: { [key: string]: number | string };
+    objective_values: { [key: string]: number };
   }>;
   n_suggestions: number;
 }
 
+export interface SuggestionResponse {
+  rank: number;
+  suggestion: { [key: string]: number | string };
+  predictions: Array<{ [key: string]: number | string }>;
+  reason: string;
+}
+
 export interface ActiveLearningResponse {
-  suggestions: Array<{ [key: string]: number }>;
-  expected_improvements: number[];
+  suggestions: SuggestionResponse[];
 }
 
 export interface ProcessDataRequest {
   config: OptimizationConfig;
-  data: { [key: string]: number[] };
+  data: Array<{
+    parameters: { [key: string]: number | string };
+    objective_values: { [key: string]: number };
+  }>;
 }
 
 export interface ProcessDataResponse {
-  statistics: { [key: string]: number };
+  statistics: { [key: string]: any };
   best_point: {
-    parameters: { [key: string]: number };
-    objective_value: number | null;
+    parameters: { [key: string]: number | string };
+    objective_values: { [key: string]: number };
   };
   parameter_importance: { [key: string]: number };
-  data: { [key: string]: number[] };
 }
 
-const api = axios.create({
-  baseURL: API_BASE_URL,
+export const api = axios.create({
+  baseURL: API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.data) {
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const generateConfig = async (prompt: string): Promise<OptimizationConfig> => {
   const { data } = await api.post("/optimization/config", { prompt });
@@ -61,10 +113,18 @@ export const generateConfig = async (prompt: string): Promise<OptimizationConfig
 };
 
 export const getCSVTemplate = async (config: OptimizationConfig): Promise<string> => {
-  const response = await api.post("/optimization/template", config, {
-    responseType: 'text'
-  });
-  return response.data;
+  try {
+    const response = await api.post("/optimization/template", config, {
+      responseType: 'text',
+      headers: {
+        'Accept': 'text/csv'
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching CSV template:', error);
+    throw new Error('Failed to generate CSV template');
+  }
 };
 
 export const getSuggestions = async (request: ActiveLearningRequest): Promise<ActiveLearningResponse> => {

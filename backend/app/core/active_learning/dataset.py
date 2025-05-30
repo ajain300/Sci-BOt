@@ -82,6 +82,9 @@ class AL_Dataset:
     def __init__(self, data_config : OptimizationConfig, data : List[DataPoint]):
         self.config = data_config
         
+        for feature_config in self.config.features:
+            logger.debug("Printing feature configs")
+            logger.debug(f"Feature config: {feature_config}")
         self._set_dataset(data)
         
         # initialize properties information as empty
@@ -156,11 +159,11 @@ class AL_Dataset:
         data = self.wide_dataset
         
         logger.debug(f"Data before processing {data}")
-
+        
         # PROCESS FEATURES
         for feature_config in self.config.features:
             logger.debug(f"Processing feature: {feature_config.name}")
-            
+            logger.debug(f"Feature config: {feature_config}")
             # Create appropriate feature object using factory
             feature = create_feature(feature_config)
             feature.process()
@@ -172,7 +175,7 @@ class AL_Dataset:
             # Process the feature data
             data = self._process_feature_data(data, feature)
 
-        logger.debug(f"data after feature process {data}")
+        logger.debug(f"data after feature process {data.to_string()}")
         # PROCESS OBJECTIVES
         for objective in self.config.objectives:
             logger.debug(f"Processing objective: {objective.name}")
@@ -261,8 +264,14 @@ class AL_Dataset:
     def _process_feature_data(self, data: pd.DataFrame, feature: FeatureBase) -> pd.DataFrame:
         """Process feature data based on the feature type."""
         logger.debug(f"Processing feature data for {feature.name}")
-        
-        if isinstance(feature, CompositionFeatureConfig):
+        logger.debug(f"is composition feature: {isinstance(feature, CompositionFeature)}")
+        logger.debug(f"is discrete feature: {isinstance(feature, DiscreteFeature)}")
+        logger.debug(f"is continuous feature: {isinstance(feature, ContinuousFeature)}")
+        logger.debug(f"is feature base: {isinstance(feature, Feature)}")
+        logger.debug(f"feature type: {type(feature)}")
+        logger.debug(f"feature name: {feature.name}")
+        if isinstance(feature, CompositionFeature):
+            logger.debug(f"{feature.name} is composition feature")
             # Process composition feature
             for part in feature.parts:
                 if data[part].nunique() == 1:
@@ -270,32 +279,28 @@ class AL_Dataset:
                     self.drop_X_columns.append(part)
                     logger.warning(f"Dropping {part} as it has only one unique value")
             
-        elif isinstance(feature, DiscreteFeatureConfig):
+        elif isinstance(feature, DiscreteFeature):
+            logger.debug(f"{feature.name} is discrete feature")
             # Process discrete feature by one-hot encoding
             col = feature.name
             data = pd.get_dummies(data, columns=[col], prefix=col)
             
+            logger.debug(f"data after one-hot encoding feature {feature.name}: {data.to_string()}")
+            
             # Update feature columns with one-hot encoded columns
             one_hot_columns = [c for c in data.columns if c.startswith(f"{col}_")]
             feature.X_columns = one_hot_columns
-            
             # Store one-hot encoding information
-            for i, encoded_col in enumerate(one_hot_columns):
-                feature.variable_info[encoded_col] = {
-                    'scaling': feature.scaling,
-                    'OH_encoding': [1 if i == j else 0 for j in range(len(one_hot_columns))]
-                }
+            feature.add_OH_info(one_hot_columns)
             
-        elif isinstance(feature, ContinuousFeatureConfig):
+        elif isinstance(feature, ContinuousFeature):
+            logger.debug(f"{feature.name} is continuous feature")
             # Process continuous feature
             col = feature.name
             if data[col].nunique() == 1:
                 data = data.drop(columns=col)
                 self.drop_X_columns.append(col)
                 logger.warning(f"Dropping {col} as it has only one unique value")
-            else:
-                feature.variable_info[col] = {'scaling': feature.scaling}
-        
         return data
 
     def _process_targets(self, data: pd.DataFrame):

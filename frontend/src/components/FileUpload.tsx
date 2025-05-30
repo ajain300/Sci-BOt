@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
 
 interface Props {
-  onDataLoaded: (data: { [key: string]: number[] }) => void;
+  onDataLoaded: (data: { [key: string]: (string | number)[] }) => void;
   accept?: string;
 }
 
@@ -20,7 +20,7 @@ export default function FileUpload({ onDataLoaded, accept = ".csv,.xlsx,.tsv" }:
   const processFile = async (file: File) => {
     try {
       console.log('Processing file:', file.name);
-      const data: { [key: string]: number[] } = {};
+      const data: { [key: string]: (string | number)[] } = {};
       
       if (file.name.endsWith('.csv') || file.name.endsWith('.tsv')) {
         const text = await file.text();
@@ -47,10 +47,15 @@ export default function FileUpload({ onDataLoaded, accept = ".csv,.xlsx,.tsv" }:
           const rowData = rows[i].map(cell => cell.trim());
           console.log(`Processing row ${i}:`, rowData);
           rowData.forEach((value, j) => {
+            // Try to parse as float first
             const parsedValue = parseFloat(value);
-            console.log(`Parsing value for ${headers[j]}:`, value, '→', parsedValue);
             if (!isNaN(parsedValue)) {
+              // It's a number, store as number
               data[headers[j]].push(parsedValue);
+            } else {
+              // It's not a number, store the string value directly
+              console.log(`Storing non-numeric value for ${headers[j]}:`, value);
+              data[headers[j]].push(value);
             }
           });
         }
@@ -89,6 +94,8 @@ export default function FileUpload({ onDataLoaded, accept = ".csv,.xlsx,.tsv" }:
           });
         });
       }
+
+      console.log('Final processed data:', data);
 
       // Validate that we have data
       if (Object.keys(data).length === 0) {

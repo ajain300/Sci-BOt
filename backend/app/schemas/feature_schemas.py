@@ -29,6 +29,10 @@ class ContinuousFeatureConfig(FeatureBase):
     type: str = "continuous"
     min: float
     max: float
+    scaling: Optional[str] = Field(
+        default="lin",
+        description="Scaling type for the continuous values"
+    )
 
 class DiscreteFeatureConfig(FeatureBase):
     type: str = "discrete"

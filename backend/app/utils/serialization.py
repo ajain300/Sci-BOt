@@ -62,7 +62,7 @@ def convert_data_points_to_dict(data_points: List[DataPoint]) -> List[dict]:
     return [
         {
             "parameters": {
-                k: float(v) for k, v in point.parameters.items()  # Ensure all values are float
+                k: float(v) if isinstance(v, (int, float)) else v for k, v in point.parameters.items()  # Ensure all values are float unless they're strings
             },
             "objective_values": point.objective_values if hasattr(point, 'objective_values') else {
                 "reaction_yield": point.objective_value,

@@ -161,7 +161,6 @@ class NaiveMOFunction(AcquisitionFunction):
         
         return acquired_samples, acq_sample_mean, acq_sample_std
 
-
 class Score_Diversity_Batch(AcquisitionFunction):
     """
     Samples that fit the score criteria but use the clustering from the diversity.
@@ -184,12 +183,12 @@ class Score_Diversity_Batch(AcquisitionFunction):
     
     def recommend(self, N_samples = 10, property = None, **kwargs):
         # Get the predictions
-        print("naive mo scoring")
+        logger.info("Running Naive MO scoring")
         mean, std, candidates, candidate_col = self._get_predictions()
         for prop_name, prop_obj in self.targets.items():
-            print(prop_name)
-            print(prop_obj.name)
-            print(prop_obj.X_columns)
+            logger.debug(prop_name)
+            logger.debug(prop_obj.name)
+            logger.debug(prop_obj.X_columns)
         
         # Unnormalize the predictions
         for prop, preds in mean.items():
@@ -202,18 +201,51 @@ class Score_Diversity_Batch(AcquisitionFunction):
             print(target.score(mean[target_name], std[target_name]))
             score += target.score(mean[target_name], std[target_name])
 
-        print(score)
-
         top_ind = np.argsort(score)[-N_samples:]
-        print(candidates)
-        print(top_ind)
+
 
         acquired_samples = candidates.iloc[top_ind].to_numpy()
 
-        print(acquired_samples)
         acquired_samples = pd.DataFrame(acquired_samples, columns=candidate_col)
 
-        return acquired_samples
+        return acquired_samples, mean, std
         
+class Combined_Single_EI(AcquisitionFunction):
+    def __init__(self, model: BaseModel, dataset: AL_Dataset, targets: Dict[str, Target], **kwargs):
+        super().__init__(model, dataset, **kwargs)
+        self.targets = targets
+        logger.info("Initializing Combined_Single_EI acquisition function.")
+        
+    def recommend(self, N_samples = 10, property = None, **kwargs):
+        # Get the predictions
+        mean, std, candidates, candidate_col = self._get_predictions()
+ 
+        # Get the EI for each target
+        ei_dict = {}
+        for target_name, target in self.targets.items():
+            # get the starting y data so that we can use it in the EI calculation for y_best
+            y_data_target = self.dataset.input_data.groupby('Y_variable').get_group(target_name)['Y_value'].values
+            ei_dict[target_name] = target.EI(mean[target_name], std[target_name], y_data = y_data_target)
+        
+        # Multiply the EIs
+        ei_product = np.prod(list(ei_dict.values()), axis = 0)    
+        
+        logger.debug(f"ei_product shape: {ei_product.shape}")
 
+        # Get the top N samples
+        top_ind = np.argsort(ei_product)[-N_samples:]
         
+        logger.debug(f"Nsamples: {N_samples}")
+        logger.debug(f"top_ind shape: {top_ind.shape}")
+        # Get unnormalized predictions for the top N samples
+        top_samples = candidates.iloc[top_ind].to_numpy()
+        for prop, preds in mean.items():
+            mean[prop], std[prop] = self.dataset.unnormalize(preds[top_ind], self.targets[prop].X_columns[0], data_std = std[prop][top_ind])
+
+        acquired_samples = pd.DataFrame(top_samples, columns=candidate_col)
+
+        logger.debug(acquired_samples.head().to_string())
+        logger.debug(mean)
+        logger.debug(std)
+        return acquired_samples, mean, std
+

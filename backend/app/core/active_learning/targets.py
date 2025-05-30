@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from ...schemas.optimization import OptimizationDirection
 from ...schemas.target_schemas import *
+from .utils.basic_acquisition import Expected_Improvement
 
 class Target(ABC):
     def __init__(
@@ -69,6 +70,16 @@ class Target(ABC):
             return score_range(mean, [self.range_min, self.range_max])
         else:
             raise ValueError(f"Invalid target type '{self.type}'")
+
+    def EI(self, mean, std, y_data) -> float:
+        if self.type == 'uncertainty' or self.type == 'range':
+            return self.score(mean, std)
+        elif self.type == 'target':
+            y_best = y_data[np.argmin(self.target_value - y_data)]
+            return Expected_Improvement(mean, std, y_best, type = 'MIN')
+        elif self.type == 'extreme':
+            y_best = y_data[np.argmin(y_data)] if self.direction == 'MIN' else y_data[np.argmax(y_data)]
+            return Expected_Improvement(mean, std, y_best, type = self.direction)
 
 class UncertaintyTarget(Target):
     def process(self):

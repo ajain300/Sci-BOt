@@ -14,6 +14,7 @@ from ...schemas.optimization import DataPoint
 class Active_Learning_Loop:
     rec_to_acq_func = {'diversity_uncertainty': Diversity_Batch,
                        'best_score': NaiveMOFunction,
+                       'combined_single_ei': Combined_Single_EI
                        }
     model_type_to_obj = {'GPR': GaussianProcessModel}
     
@@ -72,7 +73,7 @@ class Active_Learning_Loop:
             recs[prop + '_mean'] = preds
             recs[prop + '_std'] = sample_std[prop]
 
-        return recs
+        return recs, sample_mean.keys() # return the recs and the objective names
 
     async def get_suggestions(self, data: List[DataPoint], n_suggestions: int) -> Tuple[List[Dict[str, float]], List[float]]:
         """Convert input data to AL_Dataset format and get suggestions using run_Loop."""

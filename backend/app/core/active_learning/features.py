@@ -15,11 +15,19 @@ class CompositionFeatureConfig(FeatureBase):
         ...,
         description="Dictionary containing parts list and their ranges"
     )
+    scaling: str = Field(
+        default="lin",
+        description="Scaling type for the composition feature"
+    )
 
 class ContinuousFeatureConfig(FeatureBase):
     type: str = "continuous"
     min: float
     max: float
+    scaling: str = Field(
+        default="lin",
+        description="Scaling type for the continuous feature"
+    )
 
 class DiscreteFeatureConfig(FeatureBase):
     type: str = "discrete"
@@ -59,6 +67,9 @@ class ContinuousFeature(Feature):
         super().__init__(feature_config)
         self.min = feature_config.min
         self.max = feature_config.max
+        self.scaling = feature_config.scaling
+        
+        logger.debug(f"Created ContinuousFeature: min={self.min}, max={self.max}, scaling={self.scaling}")
         
     def process(self) -> None:
         """Process continuous feature"""
@@ -72,9 +83,17 @@ class DiscreteFeature(Feature):
     def process(self) -> None:
         """Process discrete feature"""
         self.X_columns = [self.name]
+    
+    def add_OH_info(self, one_hot_columns: List[str]) -> None:
+        self.one_hot_columns = {}
+        for i, encoded_col in enumerate(one_hot_columns):
+            self.one_hot_columns[encoded_col] = {
+                'OH_encoding': [1 if i == j else 0 for j in range(len(one_hot_columns))]
+            }
 
 def create_feature(config: Union[Dict, BaseModel]) -> Feature:
     """Factory function to create appropriate feature object"""
+    logger.debug(f"Creating feature with config: {config}")
     if isinstance(config, dict):
         if config["type"] == "composition":
             return CompositionFeature(CompositionFeatureConfig(**config))

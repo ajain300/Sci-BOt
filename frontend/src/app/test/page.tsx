@@ -1,30 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { useToast } from "@/hooks/use-toast";
-import { Toaster } from "@/components/ui/toaster";
-import { generateConfig } from "@/lib/api";
-import type { OptimizationConfig } from "@/lib/api";
+import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 import ActiveLearning from "@/components/ActiveLearning";
-import DataAnalysis from "@/components/DataAnalysis";
 import CSVPreview from "@/components/CSVPreview";
+import { getMockConfig } from "@/lib/mockData";
+import type { OptimizationConfig } from "@/lib/api";
 import { formatParamName } from "@/lib/utils/stringUtils";
+import { api } from "@/lib/api";
 
-const formSchema = z.object({
-  prompt: z.string().min(10, "Prompt must be at least 10 characters"),
-});
-
-type FormData = z.infer<typeof formSchema>;
-
-export default function Home() {
+export default function TestPage() {
   const [config, setConfig] = useState<OptimizationConfig | null>(null);
   const [isConfigAccepted, setIsConfigAccepted] = useState(false);
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-  });
   const [editingField, setEditingField] = useState<{
     type: 'feature' | 'objective' | 'component';
     id: string;
@@ -32,45 +20,7 @@ export default function Home() {
     componentName?: string;  // For composition components
   } | null>(null);
 
-  const { toast } = useToast();
-
-  const onSubmit = async (data: FormData) => {
-    try {
-      const config = await generateConfig(data.prompt);
-      setConfig(config);
-      toast({
-        description: "Configuration generated successfully!"
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        description: "Failed to generate configuration"
-      });
-    }
-  };
-
-  const handleInputKeyDown = (
-    e: React.KeyboardEvent<HTMLInputElement>, 
-    id: string, 
-    property: string, 
-    type: 'feature' | 'objective' | 'component' = 'feature',
-    componentName?: string
-  ) => {
-    if (e.key === 'Enter') {
-      const value = property === 'name' ? e.currentTarget.value : Number(e.currentTarget.value);
-      if (property !== 'name' && isNaN(value as number)) {
-        toast({
-          variant: "destructive",
-          description: "Please enter a valid number"
-        });
-        return;
-      }
-      handleValueUpdate(id, property, value, type, componentName);
-      setEditingField(null);
-    } else if (e.key === 'Escape') {
-      setEditingField(null);
-    }
-  };
+  const { toast } = useToast()
 
   const handleValueUpdate = (
     id: string,
@@ -188,6 +138,39 @@ export default function Home() {
     setEditingField(null);
   };
 
+  const handleInputKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>, 
+    id: string, 
+    property: string, 
+    type: 'feature' | 'objective' | 'component' = 'feature',
+    componentName?: string
+  ) => {
+    if (e.key === 'Enter') {
+      const value = property === 'name' ? e.currentTarget.value : Number(e.currentTarget.value);
+      if (property !== 'name' && isNaN(value as number)) {
+        toast({
+          variant: "destructive",
+          description: "Please enter a valid number"
+        });
+        return;
+      }
+      handleValueUpdate(id, property, value, type, componentName);
+      setEditingField(null);
+    } else if (e.key === 'Escape') {
+      setEditingField(null);
+    }
+  };
+
+  // Load mock config on component mount
+  useEffect(() => {
+    const mockConfig = getMockConfig();
+    setConfig(mockConfig);
+    setIsConfigAccepted(false);
+    toast({
+      description: "Mock configuration loaded for testing!"
+    });
+  }, []);
+
   const handleAcceptConfig = () => {
     setIsConfigAccepted(true);
     toast({
@@ -198,31 +181,14 @@ export default function Home() {
   return (
     <div className="container mx-auto px-4 py-8">
       <Toaster />
-      <h1 className="text-4xl font-bold mb-8">Scientific Optimization</h1>
+      <h1 className="text-4xl font-bold mb-8">Scientific Optimization (Test Mode)</h1>
       
       <div className="space-y-8">
         <div className="card p-6">
-          <h2 className="text-2xl font-semibold mb-4">Generate Configuration</h2>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Describe your optimization problem
-              </label>
-              <textarea
-                {...register("prompt")}
-                className="input-base w-full h-32 p-2 rounded-md"
-                placeholder="e.g., Optimize the efficiency of a solar panel by adjusting tilt angle and material thickness..."
-              />
-              {errors.prompt && (
-                <p className="text-red-500 text-sm mt-1">{errors.prompt.message as string}</p>
-              )}
-            </div>
-            <button type="submit" className="btn-primary">
-              Generate Configuration
-            </button>
-          </form>
+          <h2 className="text-2xl font-semibold mb-4">Mock Configuration</h2>
+          <p className="mb-4">This page uses a mock configuration for testing without LLM prompts.</p>
         </div>
-        
+
         {config && (
           <div className="card p-6">
             <h2 className="text-2xl font-semibold mb-4">Generated Configuration</h2>
@@ -487,85 +453,3 @@ export default function Home() {
     </div>
   );
 }
-
-        {/* {config && (
-          <div className="card p-6">
-            <h2 className="text-2xl font-semibold mb-4">Generated Configuration</h2>
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-medium">Objectives</h3>
-                <div className="space-y-2">
-                  {config.objectives.map((objective, index) => (
-                    <div key={index} className="text-zinc-600 dark:text-zinc-300">
-                      <p><span className="font-medium">{objective.name}</span> ({objective.direction})</p>
-                      {objective.target_value && (
-                        <p>Target: {objective.target_value}</p>
-                      )}
-                      {objective.range_min !== undefined && objective.range_max !== undefined && (
-                        <p>Range: [{objective.range_min}, {objective.range_max}]</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h3 className="font-medium">Parameters</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {config.features.map((feature) => (
-                    <div key={feature.name} className="bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
-                      <p className="font-medium">{feature.name}</p>
-                      <p className="text-zinc-600 dark:text-zinc-300">
-                        Type: {feature.type}
-                      </p>
-                      {feature.type === 'continuous' && (
-                        <p className="text-zinc-600 dark:text-zinc-300">
-                          Range: [{feature.min}, {feature.max}]
-                        </p>
-                      )}
-                      {feature.type === 'discrete' && (
-                        <p className="text-zinc-600 dark:text-zinc-300">
-                          Options: {feature.categories.join(', ')}
-                        </p>
-                      )}
-                      {feature.type === 'composition' && (
-                        <>
-                          <p className="text-zinc-600 dark:text-zinc-300">
-                            Components: {feature.columns.parts.join(', ')}
-                          </p>
-                          {Object.entries(feature.columns.range).map(([component, [min, max]]) => (
-                            <p key={component} className="text-zinc-600 dark:text-zinc-300">
-                              {component}: [{min}, {max}]
-                            </p>
-                          ))}
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {config.constraints && config.constraints.length > 0 && (
-                <div>
-                  <h3 className="font-medium">Constraints</h3>
-                  <ul className="list-disc list-inside text-zinc-600 dark:text-zinc-300">
-                    {config.constraints.map((constraint, i) => (
-                      <li key={i}>{constraint}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {config && (
-          <>
-            <CSVPreview config={config} />
-            <ActiveLearning config={config} />
-            <DataAnalysis config={config} />
-          </>
-        )}
-      </div>
-    </div>
-  );
-} */}
-

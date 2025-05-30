@@ -1,7 +1,7 @@
-PEGDA,IBOA,IDA,Curing_percentage,Experiment_type,Young's_modulus,Tg
+PEGDA_concentration,IBOA_concentration,IDA_concentration,curing_time,Experiment_type,Young's_modulus,Tg
 100,0,0,80,Experiment,0.02,278
 0,100,0,40,Experiment,438.01,363
-0,0,100,50,Experiment,1028.0,359.4
+0,0,100,50,Experiment,1028,359.4
 50,50,0,30,Experiment,0.15,278.8
 50,0,50,15,Experiment,28.89,357.5
 0,50,50,90,Experiment,1870.01,366.3

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { getCSVTemplate } from "@/lib/api";
 import type { OptimizationConfig } from "@/lib/api";
-import { toast } from "react-hot-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface Props {
   config: OptimizationConfig;
@@ -11,6 +11,7 @@ interface Props {
 
 export default function CSVPreview({ config }: Props) {
   const [headers, setHeaders] = useState<string[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchTemplate = async () => {
@@ -20,11 +21,15 @@ export default function CSVPreview({ config }: Props) {
         const headers = content.trim().split(',');
         setHeaders(headers);
       } catch (error) {
-        toast.error("Failed to generate CSV template");
+        toast({
+          title: "Error",
+          description: "Failed to generate CSV template",
+          variant: "destructive"
+        });
       }
     };
     fetchTemplate();
-  }, [config]);
+  }, [config, toast]);
 
   const handleDownload = () => {
     // Create CSV content from headers

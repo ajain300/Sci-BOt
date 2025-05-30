@@ -4,14 +4,16 @@ from ...schemas.optimization import (
     ConfigGenerationRequest,
     OptimizationConfig,
     ActiveLearningRequest,
-    ActiveLearningResponse,
+    SuggestionsResponse,
     ProcessDataRequest,
-    ProcessDataResponse
+    ProcessDataResponse,
+    ConfigUpdateRequest
 )
 from ...core.llm import generate_config
 from ...core.active_learning import ActiveLearningOptimizer
 from ...core.data_processing import analyze_data
 from ...core.logging_config import setup_logging
+from pprint import pformat
 import io
 import logging
 import csv
@@ -37,10 +39,16 @@ async def get_csv_template(config: OptimizationConfig):
     try:
         # Create CSV in memory
         output = io.StringIO()
-        writer = csv.writer(output)
-        
+        writer = csv.writer(output)    
+        # Get feature columns
+        feature_columns = []
+        for feature in config.features:
+            if feature.type != "composition":
+                feature_columns.append(feature.name)
+            else:
+                feature_columns.extend(feature.columns.parts)
         # Get all parameter names and add objective variable
-        headers = list(config.parameters.keys()) + [config.objective_variable]
+        headers = feature_columns + [objective.name for objective in config.objectives]
         writer.writerow(headers)
         
         # Create response with CSV file
@@ -55,12 +63,14 @@ async def get_csv_template(config: OptimizationConfig):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/suggest", response_model=ActiveLearningResponse)
-async def get_suggestions(request: ActiveLearningRequest) -> ActiveLearningResponse:
+@router.post("/suggest", response_model=SuggestionsResponse)
+async def get_suggestions(request: ActiveLearningRequest) -> SuggestionsResponse:
     try:
         optimizer = ActiveLearningOptimizer(request.config, request.data)
         response = await optimizer.get_suggestions(request.n_suggestions)
-        return response
+        analysis_result = await optimizer.evaluate_suggestions()
+        return SuggestionsResponse(**analysis_result)
+        
     except Exception as e:
         logger.error(f"Error in get_suggestions: {str(e)}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")
@@ -80,3 +90,23 @@ async def process_data(request: ProcessDataRequest):
         return response
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) 
+
+
+
+@router.post("/config/update")
+async def update_config(request: ConfigUpdateRequest):
+    try:
+        # Update the configuration in your backend storage
+        # This will depend on how you're storing the configuration
+        await update_optimization_config(
+            type=request.type,
+            id=request.id,
+            property=request.property,
+            value=request.value
+        )
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update configuration: {str(e)}"
+        )
