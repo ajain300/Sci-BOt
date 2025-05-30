@@ -1,21 +1,36 @@
-# Sci-Opt-LLM: Scientific Optimization with LLM Frontend
+# Sci-BOt: Driving Scientific Optimization using Natural Language
 
-A monorepo containing a Next.js frontend and FastAPI backend for scientific optimization using Bayesian optimization and active learning, powered by LLMs.
+A monorepo containing a Next.js frontend and FastAPI backend for scientific optimization using Bayesian optimization and active learning, enhanced by LLMs.
 
 ## Project Structure
 
 ```
-sci-opt-llm/
-├── frontend/          # Next.js frontend application
-├── backend/           # FastAPI backend application
-│   ├── app/
-│   │   ├── api/      # API routes
-│   │   ├── core/     # Core business logic
-│   │   ├── models/   # Database models
-│   │   ├── schemas/  # Pydantic schemas
-│   │   └── utils/    # Utility functions
-│   └── tests/        # Backend tests
-└── dataset/          # Sample datasets and configurations
+sci-llm/
+├── frontend/                # Next.js frontend application
+│   ├── src/                # Source code
+│   │   ├── app/           # Next.js app router pages
+│   │   ├── components/    # React components
+│   │   ├── lib/           # Utilities and API client
+│   │   ├── hooks/         # React hooks
+│   │   └── __tests__/     # Frontend tests
+│   ├── public/            # Static assets
+│   └── package.json       # Frontend dependencies
+├── backend/               # FastAPI backend application
+│   ├── app/              # Main application
+│   │   ├── api/          # API routes
+│   │   ├── core/         # Core business logic
+│   │   ├── schemas/      # Pydantic schemas
+│   │   └── utils/        # Utility functions
+│   ├── tests/            # Backend tests
+│   ├── main.py           # Application entry point
+│   └── requirements.txt   # Python dependencies
+├── dataset/              # Sample datasets and configurations
+│   ├── data_format_example.csv  # Example data format
+│   ├── json_example.json        # Example configuration
+│   └── test_problems.txt        # Test problem descriptions
+├── active_learning/      # Active learning module
+├── pyproject.toml        # Python project configuration
+└── package.json          # Root dependencies
 ```
 
 ## Prerequisites
@@ -87,7 +102,3 @@ Or run them separately:
 3. Commit your changes
 4. Push to the branch
 5. Create a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
